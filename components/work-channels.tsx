@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Phone, Send, MessageCircle, Instagram, Inbox, ShieldCheck, X, LoaderCircle, ChevronRight } from 'lucide-react';
 import './work-channels.css';
+import { Today } from './today';
 const sources = [
   {id:'phone',name:'Телефония',text:'Звонки, пропущенные вызовы и история клиентов',icon:Phone},
   {id:'telegram',name:'Telegram Business',text:'Рабочие сообщения и история общения',icon:Send},
@@ -17,7 +18,7 @@ type Outcome=keyof typeof outcomes;
 const demoSources:Record<Id,string[]>={phone:['Тестовая АТС · отдел продаж','Тестовая АТС · аренда'],telegram:['Демо · заявки на покупку','Демо · заявки на аренду'],whatsapp:['Демо · рабочий номер •• 01','Демо · рабочий номер •• 02'],instagram:['@demo_realty · Business','@demo_rent · Creator']};
 function applicable(test:Outcome,id:Id){return test==='personal'?id==='instagram':test==='bot'?id==='telegram':test==='coexist'?id==='whatsapp':true;}
 const recovery:Partial<Record<Outcome,string>>={conflict:'Выбрать другой источник',owner:'Повторить после подтверждения владельцем',bot:'Повторить после проверки бота',coexist:'Выбрать другой номер',personal:'Выбрать профессиональный аккаунт',limited:'Проверить разрешения',offline:'Повторить после восстановления сети',error:'Повторить проверку',pending:'Проверить статус',lost:'Подключить заново'};
-export function WorkChannels({onBack,role,active}:{onBack:()=>void;role:string;active:boolean}) {
+export function WorkChannels({onBack,role,active,startAtToday=false,backLabel='Назад к персонализации'}:{onBack:()=>void;role:string;active:boolean;startAtToday?:boolean;backLabel?:string}) {
  const [states,setStates]=useState<Record<Id,Status>>({phone:'none',telegram:'none',whatsapp:'none',instagram:'none'});
  const [messages,setMessages]=useState<Partial<Record<Id,string>>>({});
  const [selected,setSelected]=useState<Id>('phone');
@@ -29,14 +30,14 @@ export function WorkChannels({onBack,role,active}:{onBack:()=>void;role:string;a
  const [failures,setFailures]=useState<Partial<Record<Id,Outcome>>>({});
  const previous=useRef<{id:Id;status:Status;message:string}|null>(null);
  const [search,setSearch]=useState('');
- const [today,setToday]=useState(false);
+ const [today,setToday]=useState(startAtToday);
  const [announcement,setAnnouncement]=useState('');
  const dialog=useRef<HTMLDialogElement>(null);
  const heading=useRef<HTMLHeadingElement>(null);
  const timers=useRef<Partial<Record<Id,ReturnType<typeof setTimeout>>>>({});
  useEffect(()=>()=>Object.values(timers.current).forEach(clearTimeout),[]);
- useEffect(()=>{if(sheet&&active)dialog.current?.showModal();else dialog.current?.close();},[sheet,active]);
- useEffect(()=>{if(active)heading.current?.focus({preventScroll:true});},[active,today]);
+ useEffect(()=>{if(sheet&&active&&!today)dialog.current?.showModal();else dialog.current?.close();},[sheet,active,today]);
+ useEffect(()=>{if(active&&!today)heading.current?.focus({preventScroll:true});},[active,today]);
  const source=sources.find(s=>s.id===selected)!;
  const busy=states[selected]==='auth'||states[selected]==='verify';
  const connected=sources.filter(s=>states[s.id]==='connected');
@@ -52,10 +53,10 @@ export function WorkChannels({onBack,role,active}:{onBack:()=>void;role:string;a
  if(test==='personal'){status='unsupported';message='Для Instagram нужен Business или Creator. Переключите тип аккаунта в настройках Instagram и повторите.';}
  if(test==='lost'){status='lost';message='Срок доступа истёк. Подключите источник снова.';}
  if(status==='connected')setLinked(values=>({...values,[id]:selectedSource}));setFailures(values=>({...values,[id]:test}));patch(id,status,message);},850);}
- return <section className="channels" hidden={!active}>
- <header className="channel-nav"><button aria-label="Назад к персонализации" onClick={()=>today?setToday(false):onBack()}><ArrowLeft size={20}/></button><span>{today?'Следующий экран · №05':'Настройка 2 из 2'}</span><button onClick={()=>setToday(true)} hidden={today}>Позже</button></header>
+ return <><Today channels={states} role={role} active={active&&today} onChannels={()=>setToday(false)}/><section className="channels" hidden={!active||today}>
+ <header className="channel-nav"><button aria-label={backLabel} onClick={onBack}><ArrowLeft size={20}/></button><span>Настройка 2 из 2</span><button onClick={()=>setToday(true)}>Позже</button></header>
  <div className="channel-scroll">
- {today?<div className="channel-handoff"><Inbox size={36}/><p className="channel-eyebrow">ПЕРЕХОД К TODAY</p><h1 ref={heading} tabIndex={-1}>{connected.length?'Рабочее пространство готово к следующему этапу':'Начните с первого клиента'}</h1><p>Добавьте клиента вручную или подключите рабочий канал позже.</p><p className="channel-note">Это схема перехода, а не готовый Today. Клиенты и обращения не создавались. Экран №05 спроектируем отдельно.</p><button className="channel-secondary" onClick={()=>setToday(false)}>Вернуться к каналам</button></div>:<>
+ <>
  <p className="channel-eyebrow">ВСЕ ОБРАЩЕНИЯ · ОДНО МЕСТО</p><h1 ref={heading} tabIndex={-1}>Подключите рабочие каналы</h1><p className="channel-lead">Звонки и сообщения из подключённых источников будут собраны в одной CRM.</p><p className="channel-muted">Можно начать с одного канала. Остальные добавите позже.</p>
  <div className="channel-concept" aria-label="Концепция: рабочие источники объединяются в одном входящем ящике"><div>{sources.map(({id,icon:Icon})=><span key={id}><Icon size={19}/></span>)}</div><ArrowRight size={18}/><span><Inbox size={25}/><small>Ваши обращения</small></span></div>
  <p className="channel-demo">Интерактивное демо · сервисы не подключаются</p>
@@ -65,7 +66,7 @@ export function WorkChannels({onBack,role,active}:{onBack:()=>void;role:string;a
  {connected.length>0&&<div className="channel-note"><strong>Ваши подключения · демо</strong><ul>{sources.map(s=><li key={s.id}>{s.name} — {labels[states[s.id]]}</li>)}</ul></div>}
  <div className="channel-trust"><ShieldCheck size={23}/><div><h3>Вы управляете доступом</h3><p>Только подключённые источники и предоставленные разрешения. Доступ можно отключить в настройках.</p><button onClick={()=>setSheet('privacy')}>Как мы работаем с данными</button></div></div>
  <details className="channel-tests"><summary>Демо-сценарии проверки</summary><label htmlFor="channel-outcome">Результат следующей проверки</label><select id="channel-outcome" value={outcome} onChange={e=>setOutcome(e.target.value as Outcome)}>{Object.entries(outcomes).filter(([id])=>applicable(id as Outcome,selected)).map(([id,label])=><option value={id} key={id}>{label}</option>)}</select><p>Выбранный сценарий применяется только к проверяемому каналу. Демо-состояние сохраняется при возврате к персонализации, но сбрасывается после перезагрузки или выхода к телефону.</p>{connected.map(s=><button key={s.id} onClick={()=>patch(s.id,'lost','Демо: доступ отозван. Подключите источник снова.')}>Имитировать потерю доступа: {s.name}</button>)}</details>
- </>}
+ </>
  </div><p className="sr-only" role="status">{announcement}</p>
  {!today&&<footer className="channel-footer"><button className="primary-button" onClick={()=>setToday(true)}>Перейти в SuperApp<ArrowRight size={18}/></button><p>Все подключения можно настроить позже</p></footer>}
  <dialog ref={dialog} className="channel-dialog" onCancel={e=>{e.preventDefault();cancel();}} onClick={e=>{if(e.target===e.currentTarget)cancel();}} aria-labelledby="channel-dialog-title"><div className="channel-sheet"><button className="channel-close" aria-label="Закрыть окно" onClick={cancel}><X size={20}/></button><p className="channel-eyebrow">SUPERAPP · ДЕМО</p><h2 id="channel-dialog-title">{sheet==='privacy'?'Вы управляете данными':sheet==='disconnect'?'Отключить источник?':sheet==='cost'?'Условия внешнего сервиса':sheet==='method'?'Как вы принимаете рабочие звонки?':sheet==='sim'?'Обычная SIM-карта':sheet==='pbx'?'Облачная АТС':sheet==='review'?'Проверьте источник':source.name}</h2>
@@ -78,5 +79,5 @@ export function WorkChannels({onBack,role,active}:{onBack:()=>void;role:string;a
  {sheet==='cost'&&<><p>WhatsApp Business Platform может иметь внешние тарифы. Итог зависит от провайдера, номера, региона и типа сообщений. Прежде чем подключать реальный сервис, нужно отдельно ознакомиться с его условиями и подтвердить расходы.</p><p>В этом прототипе нет платежей, подписок и реальных подключений.</p><button className="channel-secondary" onClick={()=>setSheet('intro')}>Понятно</button></>}
  {sheet==='privacy'&&<><p>В демо данные сервисов не поступают. Настройки живут только в памяти открытой страницы.</p><h3>В рабочем продукте</h3><p>Подключённые источники могут передавать разрешённые события, доступные номера, сообщения и время обращения. Полная история и личные чаты не импортируются автоматически.</p><p>Доступ определяется пространством и явно назначенными правами. Руководитель не получает личные переписки сотрудника по умолчанию.</p><p>Отключение останавливает новые события, но не означает удаления старой истории. Сроки хранения, удаление, полные юридические условия и канал поддержки должны быть определены до запуска; в этом прототипе они не подключены.</p><button className="channel-secondary" onClick={()=>setSheet(null)}>Понятно</button></>}
  </div></dialog>
- </section>;
+ </section></>;
 }

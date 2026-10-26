@@ -20,9 +20,11 @@ export type Item = {
   due: number;
   rank: number;
   custom?: boolean;
+  clientId?: string;
+  assignee?: string;
 };
 
-export type Task = { id: string; time: string; title: string; context: string; state: string; done: boolean; custom?: boolean };
+export type Task = { id: string; time: string; title: string; context: string; state: string; done: boolean; custom?: boolean; dueAt?: string; clientId?: string; completedAt?: string; scope?: 'mine' | 'team' };
 
 export const channelNames: Record<ChannelId, string> = {
   phone: 'Телефония',

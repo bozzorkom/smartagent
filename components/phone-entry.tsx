@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, LockKeyhole, LoaderCircle, ShieldCheck, X } from 'lucide-react';
 import './phone-entry.css';
 import { Personalization, type PersonalizationDraft } from './personalization';
+import { WorkChannels } from './work-channels';
 
 type Scenario = 'new' | 'existing' | 'returning' | 'multiple' | 'network' | 'provider' | 'expired' | 'limited' | 'blocked';
 const scenarios: [Scenario, string][] = [['new','Новый пользователь'],['existing','Существующий пользователь'],['returning','Незавершённая настройка'],['multiple','Несколько пространств'],['network','Нет соединения'],['provider','Ошибка SMS-сервиса'],['expired','Код истёк'],['limited','Лимит отправки'],['blocked','Доступ ограничен']];
@@ -59,6 +60,7 @@ export function PhoneEntry({ onBack }: { onBack: () => void }) {
   }
   const route = routes[scenario as keyof typeof routes] || routes.new;
   if (step==='result' && scenario==='new') return <Personalization onBack={editPhone} draft={personalizationDraft} onDraftChange={setPersonalizationDraft}/>;
+  if (step==='result' && (scenario==='existing'||scenario==='returning'||(scenario==='multiple'&&space))) return <WorkChannels onBack={editPhone} role="" active startAtToday={scenario!=='returning'} backLabel="Назад к демо-входу"/>;
   return <section className="phone-entry">
     <header className="auth-nav"><button aria-label="Назад" onClick={()=>step==='phone'?onBack():editPhone()}><ArrowLeft size={21}/></button><span>SuperApp<span>.</span></span><span className="auth-demo-tag">Демо</span></header>
     <div className="auth-body" key={step}>
@@ -72,7 +74,7 @@ export function PhoneEntry({ onBack }: { onBack: () => void }) {
         <p id="auth-error" className="auth-error" role="alert">{error}</p>
         <button className="primary-button auth-submit" disabled={busy||(step==='phone'?(!valid||remaining>0):(code.length!==6||attempts>=5))}>{busy?<><LoaderCircle className="auth-spinner" size={18}/>{step==='phone'?'Отправляем код…':'Проверяем код…'}</>:step==='phone'?'Получить код':'Подтвердить и войти'}{!busy&&<ArrowRight size={18}/>}</button>
         {step==='phone'&&remaining>0&&<p className="auth-countdown" role="status">Повторить через {Math.floor(remaining/60).toString().padStart(2,'0')}:{(remaining%60).toString().padStart(2,'0')}</p>}
-      </form>:<div className="auth-result"><p><Check size={18}/>Демо-проверка пройдена</p><p>Настоящий аккаунт и сессия не создавались. Следующий экран пока не реализован.</p>{scenario==='multiple'&&!space&&['Личное пространство','Агентство · демо'].map(name=><button className="auth-space" key={name} onClick={()=>setSpace(name)}>{name}<ArrowRight size={18}/></button>)}<button className="auth-link" onClick={()=>{resetAttempt();setSpace('');setDeadline(0);setExpires(0);setStep('phone');}}>Проверить другой сценарий</button></div>}
+      </form>:<div className="auth-result"><p><Check size={18}/>Демо-проверка пройдена</p><p>Выберите демонстрационное пространство. Настоящий аккаунт не создаётся; доступ к данным других людей не предоставляется.</p>{scenario==='multiple'&&!space&&['Личное пространство','Агентство · демо'].map(name=><button className="auth-space" key={name} onClick={()=>setSpace(name)}>{name}<ArrowRight size={18}/></button>)}<button className="auth-link" onClick={()=>{resetAttempt();setSpace('');setDeadline(0);setExpires(0);setStep('phone');}}>Проверить другой сценарий</button></div>}
       {step==='phone'&&<p className="auth-legal">Продолжая, вы принимаете <button onClick={()=>setSheet('terms')}>Условия использования</button> и подтверждаете ознакомление с <button onClick={()=>setSheet('privacy')}>Политикой конфиденциальности</button>.</p>}
       {step==='code'&&<div className="auth-resend"><p>Не получили код?</p><button disabled={remaining>0||busy} onClick={send}>{remaining>0?`Отправить повторно через ${Math.floor(remaining/60).toString().padStart(2,'0')}:${(remaining%60).toString().padStart(2,'0')}`:'Отправить код повторно'}</button><button className="auth-link" onClick={()=>setSheet('help')}>Проблемы с получением кода?</button></div>}
       <div className="auth-prototype" id="code-hint"><span className="auth-demo-dot"/>Прототип · SMS не отправляются.{step==='code'&&<><br/>Тестовый код: <strong>{demoCode}</strong>. {generation>1?'Используйте последний показанный код.':''}</>}</div>
