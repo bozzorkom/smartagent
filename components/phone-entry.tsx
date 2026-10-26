@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, LockKeyhole, LoaderCircle, ShieldCheck, X } from 'lucide-react';
 import './phone-entry.css';
+import { Personalization } from './personalization';
 
 type Scenario = 'new' | 'existing' | 'returning' | 'multiple' | 'network' | 'provider' | 'expired' | 'limited' | 'blocked';
 const scenarios: [Scenario, string][] = [['new','Новый пользователь'],['existing','Существующий пользователь'],['returning','Незавершённая настройка'],['multiple','Несколько пространств'],['network','Нет соединения'],['provider','Ошибка SMS-сервиса'],['expired','Код истёк'],['limited','Лимит отправки'],['blocked','Доступ ограничен']];
@@ -56,6 +57,7 @@ export function PhoneEntry({ onBack }: { onBack: () => void }) {
     });
   }
   const route = routes[scenario as keyof typeof routes] || routes.new;
+  if (step==='result' && scenario==='new') return <Personalization onBack={editPhone}/>;
   return <section className="phone-entry">
     <header className="auth-nav"><button aria-label="Назад" onClick={()=>step==='phone'?onBack():editPhone()}><ArrowLeft size={21}/></button><span>SuperApp<span>.</span></span><span className="auth-demo-tag">Демо</span></header>
     <div className="auth-body" key={step}>
