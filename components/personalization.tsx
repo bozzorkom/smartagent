@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, UserRound, UsersRound, Building2, Check, PhoneIncoming, Bell, Database, ScanSearch, CalendarCheck, ChartNoAxesCombined, UserPlus, LoaderCircle, SlidersHorizontal } from 'lucide-react';
 import './personalization.css';
+import { WorkChannels } from './work-channels';
 const roles = [
   { id:'solo', title:'Работаю самостоятельно', description:'Веду своих клиентов и объекты сам', icon:UserRound },
   { id:'agent', title:'Работаю в агентстве', description:'Я риэлтор в команде', icon:UsersRound },
@@ -36,6 +37,7 @@ export function Personalization({onBack,draft,onDraftChange}:{onBack:()=>void;dr
   const [error,setError]=useState(false);
   const [result,setResult]=useState<'created'|'skipped'|null>(null);
   const [retrySkip,setRetrySkip]=useState(false);
+  const [channelsOpen,setChannelsOpen]=useState(false);
   const timer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const lock=useRef(false);
   const root=useRef<HTMLElement>(null);
@@ -53,9 +55,9 @@ export function Personalization({onBack,draft,onDraftChange}:{onBack:()=>void;dr
   }
   const first = role==='owner'?['leads','team','deals']:role==='agent'?['leads','clients','deals']:['leads','clients','match'];
   const ordered=[...first.map(id=>goals.find(goal=>goal.id===id)!),...goals.filter(goal=>!first.includes(goal.id))];
-  return <section className="personalization" ref={root} aria-busy={busy}>
+  return <><WorkChannels active={channelsOpen} role={result==='skipped'?'':role} onBack={()=>{setChannelsOpen(false);setResult(null);}}/><section className="personalization" style={channelsOpen?{display:'none'}:undefined} ref={root} aria-busy={busy}>
     <header className="personal-nav"><button aria-label="Назад" disabled={busy} onClick={()=>result?setResult(null):onBack()}><ArrowLeft size={21}/></button><span>Настройка {result?'2':'1'} из 2</span>{!result?<button disabled={busy} onClick={()=>save(true)}>Позже</button>:<span className="personal-demo">Демо</span>}</header>
-    {result?<div className="personal-content personal-next"><span className="personal-symbol"><SlidersHorizontal size={28}/></span><p className="personal-kicker">СЛЕДУЮЩИЙ ЭТАП · №04</p><h1 tabIndex={-1}>Подключение рабочих каналов</h1><p>Здесь вы сможете выбрать рабочие источники обращений. Этот экран спроектируем следующим.</p><div className="personal-summary"><strong>{result==='skipped'?'Нейтральное личное пространство':roles.find(r=>r.id===role)?.title}</strong><p>{result==='skipped'?'Персонализация не завершена. Роль и специализация не назначены.':specialties.length?specialties.join(' · '):'Без выбранной специализации'}</p>{result==='created'&&role==='owner'&&team&&<p>Размер команды: {team}</p>}{result==='created'&&<><strong>Рекомендуем для начала</strong>{priorities.length>0?<ul>{priorities.map(id=><li key={id}>{recommendations[id]}</li>)}</ul>:<p>Базовый обзор клиентов, объектов и дел. Приоритеты можно выбрать позже.</p>}<p>Это рекомендации по вашим ответам, а не подключённые сервисы. Доступ к данным, рабочим каналам и платным функциям потребует отдельного подтверждения.</p></>}<span>Каналы не подключены</span></div><p className="personal-disclaimer">Это результат демонстрации. Пространство и агентство не создавались, платные инструменты не подключены.</p><button className="primary-button" onClick={()=>setResult(null)}>Вернуться к настройке<ArrowLeft size={18}/></button></div>:<>
+    {result?<div className="personal-content personal-next"><span className="personal-symbol"><SlidersHorizontal size={28}/></span><p className="personal-kicker">СЛЕДУЮЩИЙ ЭТАП · №04</p><h1 tabIndex={-1}>Подключение рабочих каналов</h1><p>Выберите рабочие источники обращений или продолжите без подключений. Все действия остаются демонстрационными.</p><div className="personal-summary"><strong>{result==='skipped'?'Нейтральное личное пространство':roles.find(r=>r.id===role)?.title}</strong><p>{result==='skipped'?'Персонализация не завершена. Роль и специализация не назначены.':specialties.length?specialties.join(' · '):'Без выбранной специализации'}</p>{result==='created'&&role==='owner'&&team&&<p>Размер команды: {team}</p>}{result==='created'&&<><strong>Рекомендуем для начала</strong>{priorities.length>0?<ul>{priorities.map(id=><li key={id}>{recommendations[id]}</li>)}</ul>:<p>Базовый обзор клиентов, объектов и дел. Приоритеты можно выбрать позже.</p>}<p>Это рекомендации по вашим ответам, а не подключённые сервисы. Доступ к данным, рабочим каналам и платным функциям потребует отдельного подтверждения.</p></>}<span>Статусы источников — на следующем этапе</span></div><p className="personal-disclaimer">Это результат демонстрации. Пространство и агентство не создавались, платные инструменты не подключены.</p><button className="primary-button" onClick={()=>setChannelsOpen(true)}>Настроить рабочие каналы<ArrowRight size={18}/></button><button className="channel-secondary" onClick={()=>setResult(null)}>Вернуться к настройке</button></div>:<>
     <div className="personal-content">
       <p className="personal-kicker">ВАШ РИТМ. ВАШИ ИНСТРУМЕНТЫ.</p><h1 tabIndex={-1}>Настроим SuperApp под вас</h1><p className="personal-subtitle">Расскажите немного о своей работе. Мы предложим подходящие инструменты.</p>
       {mode==='offline'&&<p className="personal-banner" role="status">Нет соединения. Выбор остаётся в памяти этого экрана, но не отправляется на сервер.</p>}
@@ -69,5 +71,5 @@ export function Personalization({onBack,draft,onDraftChange}:{onBack:()=>void;dr
     </div>
     <footer className="personal-footer">{error&&<div className="personal-error" role="alert"><strong>Не удалось сохранить настройки</strong><p>Проверьте соединение и попробуйте ещё раз. Ответы не потеряны.</p></div>}<button className="primary-button" aria-describedby="personal-continue-hint" disabled={busy||(!role&&!error)} onClick={()=>save(error?retrySkip:false)}>{busy?<><LoaderCircle className="auth-spinner" size={18}/>Подготавливаем пространство…</>:error?'Повторить':<>Создать моё пространство<ArrowRight size={18}/></>}</button><p id="personal-continue-hint" aria-live="polite">{role?'Настройки и инструменты можно изменить позже':'Выберите роль, чтобы продолжить, или нажмите «Позже»'}</p></footer>
     </>}
-  </section>;
+  </section></>;
 }
