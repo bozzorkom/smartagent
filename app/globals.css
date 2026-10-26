@@ -1313,7 +1313,39 @@ body {
 @container (max-width:340px) { .module-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .match-pair { flex-direction:column; gap:16px; } }
 @media(max-width:540px) { .preview-options { display:none; } .device.tablet,.device.tablet.landscape { width:100%; height:100svh; } .tablet.landscape .slide { display:block; padding:24px; } .tablet.landscape .intro-copy { margin-bottom:32px; } }
 @media(prefers-reduced-transparency:reduce) { .app-footer { background:#fff; } }
+:root { --motion-ease: cubic-bezier(.22, 1, .36, 1); --motion-press: cubic-bezier(.2, .8, .2, 1); }
+.slide { --enter-x: 22px; animation: intro-enter 320ms var(--motion-ease) both; }
+.slide[data-direction="backward"] { --enter-x: -22px; }
+.slide .module-tile { animation: card-reveal 340ms var(--motion-ease) both; }
+.slide .scene-stack > .demo-card,
+.slide .match-pair,
+.slide .metric { animation: card-reveal 340ms var(--motion-ease) both; animation-delay:80ms; }
+.slide .scene-stack > .demo-card:nth-child(3) { animation-delay:140ms; }
+.slide .metric:nth-child(2) { animation-delay:115ms; }
+.slide .metric:nth-child(3) { animation-delay:150ms; }
+.slide .metric:nth-child(4) { animation-delay:185ms; }
+.slide .reason,.slide .task-row { animation: detail-reveal 240ms var(--motion-ease) both; animation-delay:160ms; }
+.slide .reason:nth-child(3),.slide .task-row:nth-child(3) { animation-delay:205ms; }
+.slide .reason:nth-child(4),.slide .task-row:nth-child(4) { animation-delay:250ms; }
+.slide .match-pair > div:first-child { --match-x:-8px; animation: match-align 400ms var(--motion-ease) both; }
+.slide .match-pair > div:last-child { --match-x:8px; animation: match-align 400ms var(--motion-ease) both; }
+.slide .journey-row:not(.future) .step-dot { animation: detail-reveal 260ms var(--motion-ease) both; }
+.slide .journey-row:nth-child(2) .step-dot { animation-delay:100ms; }
+.slide .journey-row.current .step-dot { animation-delay:200ms; }
+.slide .ai-note { animation: detail-reveal 280ms var(--motion-ease) 300ms both; }
+.handoff { animation:intro-enter 320ms var(--motion-ease) both; --enter-x:18px; }
+.primary-button { transition:transform 140ms var(--motion-press),background-color 140ms ease; }
+.primary-button:active { transform:scale(.98); background:#262626; }
+.app-header button,.secondary-row button,.preview-options button,.device-switch button { transition:opacity 120ms ease,background-color 160ms ease; }
+.app-header button:active,.secondary-row button:active { opacity:.55; }
+.progress button span { transition:width 260ms var(--motion-ease),background-color 200ms ease; }
+@keyframes intro-enter { from { opacity:0; transform:translate3d(var(--enter-x),0,0); } to { opacity:1; transform:translate3d(0,0,0); } }
+@keyframes card-reveal { from { opacity:0; transform:translate3d(0,8px,0) scale(.985); } to { opacity:1; transform:translate3d(0,0,0) scale(1); } }
+@keyframes detail-reveal { from { opacity:0; transform:translate3d(0,4px,0); } to { opacity:1; transform:translate3d(0,0,0); } }
+@keyframes match-align { from { transform:translate3d(var(--match-x),0,0); } to { transform:translate3d(0,0,0); } }
 @media (prefers-reduced-motion: reduce) {
+.primary-button:active { transform:none; }
+
   *,
   *:before,
   *:after {
