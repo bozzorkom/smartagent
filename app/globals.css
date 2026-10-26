@@ -1343,6 +1343,8 @@ body {
 @keyframes card-reveal { from { opacity:0; transform:translate3d(0,8px,0) scale(.985); } to { opacity:1; transform:translate3d(0,0,0) scale(1); } }
 @keyframes detail-reveal { from { opacity:0; transform:translate3d(0,4px,0); } to { opacity:1; transform:translate3d(0,0,0); } }
 @keyframes match-align { from { transform:translate3d(var(--match-x),0,0); } to { transform:translate3d(0,0,0); } }
+.slide[data-revisit="true"] { animation-duration:240ms; }
+.slide[data-revisit="true"] * { animation:none !important; }
 @media (prefers-reduced-motion: reduce) {
 .primary-button:active { transform:none; }
 
