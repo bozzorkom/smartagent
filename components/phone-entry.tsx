@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, LockKeyhole, LoaderCircle, ShieldCheck, X } from 'lucide-react';
 import './phone-entry.css';
-import { Personalization } from './personalization';
+import { Personalization, type PersonalizationDraft } from './personalization';
 
 type Scenario = 'new' | 'existing' | 'returning' | 'multiple' | 'network' | 'provider' | 'expired' | 'limited' | 'blocked';
 const scenarios: [Scenario, string][] = [['new','Новый пользователь'],['existing','Существующий пользователь'],['returning','Незавершённая настройка'],['multiple','Несколько пространств'],['network','Нет соединения'],['provider','Ошибка SMS-сервиса'],['expired','Код истёк'],['limited','Лимит отправки'],['blocked','Доступ ограничен']];
@@ -11,6 +11,7 @@ const formatPhone = (n: string) => n.replace(/^(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}
 export function PhoneEntry({ onBack }: { onBack: () => void }) {
   const [step,setStep] = useState<'phone'|'code'|'result'>('phone');
   const [phone,setPhone] = useState('');
+  const [personalizationDraft,setPersonalizationDraft] = useState<PersonalizationDraft>({role:'',team:'',specialties:[],priorities:[]});
   const [code,setCode] = useState('');
   const [error,setError] = useState('');
   const [busy,setBusy] = useState(false);
@@ -57,7 +58,7 @@ export function PhoneEntry({ onBack }: { onBack: () => void }) {
     });
   }
   const route = routes[scenario as keyof typeof routes] || routes.new;
-  if (step==='result' && scenario==='new') return <Personalization onBack={editPhone}/>;
+  if (step==='result' && scenario==='new') return <Personalization onBack={editPhone} draft={personalizationDraft} onDraftChange={setPersonalizationDraft}/>;
   return <section className="phone-entry">
     <header className="auth-nav"><button aria-label="Назад" onClick={()=>step==='phone'?onBack():editPhone()}><ArrowLeft size={21}/></button><span>SuperApp<span>.</span></span><span className="auth-demo-tag">Демо</span></header>
     <div className="auth-body" key={step}>
