@@ -6,6 +6,23 @@ const now = '2026-10-26T19:30:00.000Z'; // 27 October, 00:30 in Tashkent.
 const item = { id: 'a1', kind: 'overdue', scope: 'mine', title: 'Позвонить', context: 'Клиент №128', source: 'Вручную', type: 'Контакт', time: 'Вчера', note: '', cta: 'Открыть', reason: '', due: 0, rank: 0, clientId: 'c1' };
 const seed = () => createWorkspace({ items: [item], clients: [{ id: 'c1', name: 'Азиз', request: 'Аренда', scope: 'mine' }] });
 
+test('replayed events never reopen a resolved action or duplicate history', () => {
+  const closed = reduceWorkspace(seed(), { type: 'outcome', itemId: item.id, outcome: 'Связались', note: 'Готово' }, now);
+  assert.equal(reduceWorkspace(closed, { type: 'receive', item }, now), closed);
+});
+
+test('a new event for the same client preserves the earlier result and draft', () => {
+  const draft = reduceWorkspace(seed(), { type: 'draft', itemId: item.id, value: 'Черновик' }, now);
+  const closed = reduceWorkspace(draft, { type: 'outcome', itemId: item.id, outcome: 'Связались', note: 'Готово' }, now);
+  const event = { ...item, id: 'event-2' };
+  const next = reduceWorkspace(closed, { type: 'receive', item: event }, now);
+  assert.equal(next.items.length, 2);
+  assert.deepEqual(next.resolved, [item.id]);
+  assert.equal(next.history[1].note, 'Готово');
+  assert.equal(next.drafts[item.id], 'Черновик');
+  assert.equal(reduceWorkspace(next, { type: 'receive', item: event }, now), next);
+});
+
 test('a created client is available as a real local record with its request', () => {
   const state = reduceWorkspace(createWorkspace(), { type: 'addClient', id: 'c2', name: '  Мадина  ', request: 'Аренда · Чиланзар' }, now);
   assert.equal(state.clients[0].name, 'Мадина');

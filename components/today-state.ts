@@ -6,6 +6,7 @@ export type Workspace = { items: Item[]; tasks: Task[]; clients: Client[]; histo
 export type WorkspaceAction =
   | { type: 'addClient'; id: string; name: string; request: string; itemId?: string }
   | { type: 'addLead'; item: Item }
+  | { type: 'receive'; item: Item }
   | { type: 'addTask'; task: Task }
   | { type: 'outcome'; itemId: string; outcome: string; note: string; followUp?: { id: string; dueAt: string } }
   | { type: 'reschedule'; itemId: string; taskId: string; dueAt: string }
@@ -55,6 +56,9 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
         items: state.items.map(item => item.id === action.itemId ? { ...item, clientId: action.id } : item),
         history: record(action.id, 'Клиент добавлен', { clientId: action.id, scope: item?.scope ?? 'mine' }) };
     }
+    case 'receive':
+      if (state.items.some(value => value.id === action.item.id)) return state;
+      return { ...state, items: [...state.items, action.item], history: record(action.item.id, 'Получено демо-событие', { clientId: action.item.clientId, scope: action.item.scope }) };
     case 'addLead':
       if (!action.item.context.trim() || state.items.some(item => item.id === action.item.id)) return state;
       return { ...state, items: [...state.items, action.item], history: record(action.item.id, 'Обращение добавлено вручную', { clientId: action.item.clientId }) };
