@@ -102,6 +102,10 @@ export function taskDay(task: Pick<Task, 'done' | 'dueAt'>, now = new Date().toI
   return day < today || (day === today && task.dueAt < localDateTime(now)) ? 'overdue' : day > today ? 'future' : 'today';
 }
 
+export function todayTaskCount(tasks: Pick<Task, 'done' | 'dueAt'>[], now = new Date().toISOString()) {
+  return tasks.filter(task => taskDay(task, now) === 'today').length;
+}
+
 export type PrimaryAttention = { source: 'item'; value: Item } | { source: 'task'; value: Task } | null;
 
 export function primaryAttention(items: Item[], tasks: Task[], now = new Date().toISOString()): PrimaryAttention {

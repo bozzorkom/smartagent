@@ -167,6 +167,18 @@ test('the next dated task today becomes primary when the inquiry queue is empty'
   assert.equal(primary?.value.id, 't2');
 });
 
+test('Today task summary excludes overdue, future-day and completed tasks', () => {
+  assert.equal(typeof workspaceModel.todayTaskCount, 'function');
+  if (typeof workspaceModel.todayTaskCount !== 'function') return;
+  const tasks = [
+    { done: false, dueAt: '2026-10-27T11:29' },
+    { done: false, dueAt: '2026-10-27T11:31' },
+    { done: false, dueAt: '2026-10-28T10:00' },
+    { done: true, dueAt: '2026-10-27T12:00' },
+  ];
+  assert.equal(workspaceModel.todayTaskCount(tasks, '2026-10-27T06:30:00.000Z'), 1);
+});
+
 test('rescheduling an existing task updates its date without duplicating or losing its client', () => {
   const state = createWorkspace({ tasks: [{ id: 't1', title: 'Контакт', context: 'Азиз', clientId: 'c1', state: 'Запланировано', done: false, time: '14:00', dueAt: '2026-10-27T14:00' }] });
   const next = reduceWorkspace(state, { type: 'rescheduleTask', taskId: 't1', dueAt: '2026-10-29T12:00' }, now);
