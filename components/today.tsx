@@ -14,7 +14,7 @@ import {
   byPriority, channelNames, clockNow, demoItems, demoTasks, employees, plural, problemStates, results, scenarios,
   type ChannelId, type ChannelStates, type Item, type Kind, type Scenario, type Task,
 } from './today-data';
-import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, taskSummaryCounts, primaryAttention, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
+import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, taskSummaryCounts, teamOverdueCount, primaryAttention, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
 
 const kindIcons: Record<Kind, typeof Phone> = {
   overdue: Clock3, call: PhoneMissed, message: MessageSquare, promise: CalendarClock, review: CircleHelp,
@@ -126,6 +126,9 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const list = scope === 'team' ? team : mine;
   const todayTasks = tasks.filter(task => (task.custom || demoData) && (task.scope ?? 'mine') === (isOwner && teamData && scope === 'team' ? 'team' : 'mine'));
   const taskSummary = taskSummaryCounts(todayTasks);
+  const teamOverdueItems = team.filter(item => item.kind === 'teamOverdue');
+  const planItems = scope === 'team' ? teamOverdueItems : [];
+  const planCount = todayTasks.length + planItems.length;
   const primary = scope === 'mine' ? primaryAttention(mine, todayTasks) : null;
   const primaryItem = primary?.source === 'item' ? primary.value : null;
   const primaryTask = primary?.source === 'task' ? primary.value : null;
@@ -434,7 +437,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
             <Metric label="Задачи" value={String(taskSummary.today)} hint={taskSummary.overdue ? `${taskSummary.overdue} ${plural(taskSummary.overdue, 'просроченная', 'просроченные', 'просроченных')}` : 'срок ещё сегодня'} onClick={() => setSheet('plan')} />
           </> : <>
             <Metric label="Без ответственного" value={String(unassigned.length)} hint="ожидают назначения" onClick={() => setSheet(teamMetricDestination('unassigned'))} />
-            <Metric label="Просрочено" value={String(team.filter(i => i.kind === 'teamOverdue').length)} hint="задачи команды" onClick={() => setSheet(teamMetricDestination('overdue'))} />
+            <Metric label="Просрочено" value={String(teamOverdueCount(team, todayTasks))} hint="в плане команды" onClick={() => setSheet(teamMetricDestination('overdue'))} />
             <Metric label="Без ответа" value="Нет данных" hint="личные каналы не видны" />
           </>}
         </div>
@@ -467,7 +470,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
         </section>
 
         <section className="today-section" id="today-plan" aria-labelledby="plan-title">
-          <div className="today-row"><h2 id="plan-title" className="today-h2">{scope === 'team' ? 'Задачи команды' : 'План дня'}</h2><button className="today-link" onClick={() => setSheet('plan')}>Весь план · {todayTasks.length}</button></div>
+          <div className="today-row"><h2 id="plan-title" className="today-h2">{scope === 'team' ? 'Задачи команды' : 'План дня'}</h2><button className="today-link" onClick={() => setSheet('plan')}>Весь план · {planCount}</button></div>
           {openTasks.length ? <ul className="today-tasks">{openTasks.slice(0, 3).map(task => <li key={task.id}>
             <span className="today-time">{task.time}</span>
             <span className="today-task-text"><button className="today-task-open" onClick={() => openTask(task)}>{task.title}</button><small>{task.context}</small><small className="today-state">{task.state}</small></span>
@@ -519,7 +522,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <p className="today-note">Объекты, показы, сделки и расширенные настройки появятся отдельными экранами на следующих этапах.</p>
         </>}
         {sheet === 'inbox' && <CrmInbox items={list} initialFilter={filter} incomplete={incomplete} phoneConnected={phoneData} restricted={accessLost} team={scope === 'team' && isOwner} onOpen={openItem} onChannels={() => { closeSheet(); onChannels(); }} onAdd={() => openAdd('lead')}/>}
-        {sheet === 'plan' && <><h2 id="today-sheet-title" className="today-h2">Весь план · {todayTasks.length}</h2><p className="today-muted">Невыполненные: {pendingTasks.length} · Завершённые: {todayTasks.length - pendingTasks.length}. Счётчик на главной показывает только задачи, срок которых ещё наступит сегодня.</p>{[['Просрочено', overdueTasks], ['Сегодня', openTasks], ['Позже', futureTasks], ['Без срока', undatedTasks], ['Выполнено сегодня', doneTasks], ['Выполнено ранее', archivedTasks]].map(([label, group]) => <section key={label as string}><h3 className="today-label">{label as string} · {(group as Task[]).length}</h3>{(group as Task[]).length ? <DatedTasks tasks={group as Task[]} onToggle={toggleTask} onOpen={openTask}/> : <p className="today-muted">Нет задач в этой группе.</p>}</section>)}</>}
+        {sheet === 'plan' && <><h2 id="today-sheet-title" className="today-h2">Весь план · {planCount}</h2><p className="today-muted">{scope === 'team' ? `Просроченные сигналы: ${planItems.length} · Датированные задачи: ${todayTasks.length}.` : `Невыполненные: ${pendingTasks.length} · Завершённые: ${todayTasks.length - pendingTasks.length}. Счётчик на главной показывает только задачи, срок которых ещё наступит сегодня.`}</p>{scope === 'team' && <section><h3 className="today-label">Просроченные действия · {planItems.length}</h3>{planItems.length ? <div className="today-list">{planItems.map(item => <ActionCard key={item.id} item={item} onOpen={() => openItem(item)} onMenu={() => openItem(item)}/>)}</div> : <p className="today-muted">Нет действий в этой группе.</p>}</section>}{[['Просрочено', overdueTasks], ['Сегодня', openTasks], ['Позже', futureTasks], ['Без срока', undatedTasks], ['Выполнено сегодня', doneTasks], ['Выполнено ранее', archivedTasks]].map(([label, group]) => <section key={label as string}><h3 className="today-label">{label as string} · {(group as Task[]).length}</h3>{(group as Task[]).length ? <DatedTasks tasks={group as Task[]} onToggle={toggleTask} onOpen={openTask}/> : <p className="today-muted">Нет задач в этой группе.</p>}</section>)}</>}
         {sheet === 'clients' && (accessLost ? <><h2 id="today-sheet-title">Доступ ограничен</h2><p className="today-muted">Список клиентов скрыт до восстановления демо-доступа.</p></> : <><h2 id="today-sheet-title" className="today-h2">Клиенты в этом сеансе</h2><p className="today-muted">Быстрый список Today · данные до перезагрузки.</p>{clients.filter(client => !client.archived && (client.scope === 'mine' || (isOwner && teamData && scope === 'team'))).map(client => <button className="today-option" key={client.id} onClick={() => { setClientId(client.id); setCurrent(null); setSheet('client'); }}><span><strong>{client.name}</strong><small>{client.request || 'Запрос не указан'}</small></span><ChevronRight size={18}/></button>)}<button className="today-secondary" onClick={() => openAdd('client')}>Добавить клиента</button></>)}
         {sheet === 'client' && (client && clientDraft ? <ClientWorkspace key={client.id} client={client} draft={clientDraft} onDraftChange={updateClientDraft} items={items.filter(item => item.clientId === client.id)} tasks={tasks.filter(task => task.clientId === client.id)} history={clientHistory(workspace, client.id)} restricted={accessLost || (client.scope === 'team' && !isOwner)} onEdit={(name, request) => commit({ type: 'editClient', clientId: client.id, name, request }, 'Данные клиента обновлены.', false)} onNote={note => commit({ type: 'clientNote', clientId: client.id, note }, 'Заметка добавлена.', false)} onOpenItem={item => leaveClient(() => openItem(item))} onWrite={item => leaveClient(() => openItem(item, 'reply'))} onOpenTask={task => leaveClient(() => openTask(task))} onTask={() => leaveClient(() => openAdd('task', { clientId: client.id }))}/> : <><h2 id="today-sheet-title">Клиент ещё не связан</h2><p className="today-muted">Проверьте данные перед созданием клиента.</p><button className="today-primary" onClick={() => openAdd('client', { item: current ?? undefined })}>Создать клиента из обращения</button></>)}
         {sheet === 'history' && <><h2 id="today-sheet-title" className="today-h2">Журнал действий</h2><p className="today-muted">Результаты, отмеченные вами в текущем демо-сеансе.</p><History entries={history.filter(entry => (entry.scope ?? 'mine') === 'mine' || (isOwner && scope === 'team' && teamData))}/></>}

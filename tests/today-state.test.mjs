@@ -13,6 +13,17 @@ test('team attention metrics open the matching work list', () => {
   assert.equal(workspaceModel.teamMetricDestination('overdue'), 'plan');
 });
 
+test('team overdue summary counts visible alerts and dated tasks shown in the plan', () => {
+  assert.equal(typeof workspaceModel.teamOverdueCount, 'function');
+  if (typeof workspaceModel.teamOverdueCount !== 'function') return;
+  const items = [{ ...item, kind: 'teamOverdue' }, { ...item, id: 'u1', kind: 'unassigned' }];
+  const tasks = [
+    { done: false, dueAt: '2026-10-27T00:10' },
+    { done: false, dueAt: '2026-10-28T10:00' },
+  ];
+  assert.equal(workspaceModel.teamOverdueCount(items, tasks, now), 2);
+});
+
 test('a client linked after an inquiry sees its original history exactly once', () => {
   const inquiry = { ...item, id: 'lead', clientId: undefined };
   const created = reduceWorkspace(createWorkspace(), { type: 'addLead', item: inquiry }, now);

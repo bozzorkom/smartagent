@@ -111,6 +111,10 @@ export function taskSummaryCounts(tasks: Pick<Task, 'done' | 'dueAt'>[], now = n
   }, { today: 0, overdue: 0 });
 }
 
+export function teamOverdueCount(items: Pick<Item, 'kind'>[], tasks: Pick<Task, 'done' | 'dueAt'>[], now = new Date().toISOString()) {
+  return items.filter(item => item.kind === 'teamOverdue').length + taskSummaryCounts(tasks, now).overdue;
+}
+
 export type PrimaryAttention = { source: 'item'; value: Item } | { source: 'task'; value: Task } | null;
 
 export function primaryAttention(items: Item[], tasks: Task[], now = new Date().toISOString()): PrimaryAttention {
