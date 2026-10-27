@@ -3,6 +3,14 @@
   background: #fff; color: #111; font-size: .9375rem; line-height: 1.5;
 }
 .today[hidden] { display: none; }
+.today .today-scroll { padding: 20px 20px 32px; }
+.today .today-header h1 { font-size: 1.875rem; margin: 2px 0 4px; }
+.today .today-nav .today-add { background: #fff; color: #111; border: 1px solid #ddd; }
+.today .today-row { flex-wrap: wrap; }
+.today .today-link { min-height: 44px; }
+.today .today-demo-label { margin: 8px 0; }
+.today .today-context { margin-top: 2px; }
+@media(max-width: 340px) { .today .today-scroll { padding-inline: 16px; } .today .today-summary { grid-template-columns: 1fr; } }
 .today-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px 24px 32px; scrollbar-width: thin; }
 .today-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .today-header h1 { font-size: 2.125rem; line-height: 1.15; letter-spacing: -1.1px; font-weight: 650; margin: 6px 0 8px; }

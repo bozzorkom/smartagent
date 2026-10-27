@@ -18,7 +18,7 @@ const kindIcons: Record<Kind, typeof Phone> = {
 };
 const channelIcons: Record<ChannelId, typeof Phone> = { phone: Phone, telegram: Send, whatsapp: MessageCircle, instagram: Instagram };
 const channelIds = Object.keys(channelNames) as ChannelId[];
-type Sheet = 'action' | 'result' | 'reply' | 'reschedule' | 'assign' | 'add' | 'profile' | 'denied' | 'clients' | 'client' | 'history' | 'inbox' | 'more' | 'task' | null;
+type Sheet = 'action' | 'result' | 'reply' | 'reschedule' | 'assign' | 'add' | 'profile' | 'denied' | 'clients' | 'client' | 'history' | 'inbox' | 'more' | 'task' | 'plan' | null;
 type Filter = 'reply' | 'missed' | null;
 type Undo = { message: string; restore: () => void } | null;
 
@@ -99,7 +99,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const filtered = (scope === 'mine' ? rest : team).filter(item =>
     filter === 'reply' ? item.kind === 'message' || item.kind === 'review' : filter === 'missed' ? item.kind === 'call' : true);
   const queue = filter ? (scope === 'mine' ? mine : team).filter(item => filtered.includes(item) || (primary && item.id === primary.id && matches(item))) : filtered;
-  const shownQueue = showAll || filter ? queue : queue.slice(0, 4);
+  const shownQueue = queue.slice(0, 3);
   const todayTasks = tasks.filter(task => (task.custom || demoData) && (task.scope ?? 'mine') === (isOwner && sample && scope === 'team' ? 'team' : 'mine'));
   const openTasks = todayTasks.filter(task => taskDay(task) === 'today').sort((a, b) => a.dueAt.localeCompare(b.dueAt));
   const futureTasks = todayTasks.filter(task => taskDay(task) === 'future').sort((a, b) => a.dueAt.localeCompare(b.dueAt));
@@ -155,7 +155,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
 
   function saveResult() {
     if (!current || !outcome || saveLock.current) return;
-    if (offline) return setFormError('Нет соединения. Черновик сохранён в памяти; повторите после восстановления связи.');
+    if (offline) return setFormError('Нет соединения. Черновик сохранё�� в памяти; повторите после восстановления связи.');
     if (followUp && (!validDueAt(followUp) || followUp <= localDateTime())) return setFormError('Выберите будущие дату и время следующего контакта.');
     saveLock.current = true;
     if (scenario === 'saveError' && !failNextSave.current) {
@@ -302,7 +302,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
 
         <section className="today-section" ref={queueRef} aria-labelledby="queue-title">
           <div className="today-row"><h2 id="queue-title" className="today-h2">{filter === 'reply' ? 'Без ответа' : filter === 'missed' ? 'Пропущенные' : scope === 'team' ? 'Задачи команды' : 'Требует внимания'}</h2>
-            {filter ? <button className="today-link" onClick={() => setFilter(null)}>Сбросить<X size={14} /></button> : queue.length > 4 && <button className="today-link" onClick={() => setShowAll(v => !v)}>{showAll ? 'Свернуть' : 'Смотреть все'}</button>}</div>
+            {filter ? <button className="today-link" onClick={() => setFilter(null)}>Сбросить<X size={14} /></button> : list.length > 0 && <button className="today-link" onClick={() => setSheet('inbox')}>Все обращения · {list.length}</button>}</div>
           {callsFailed && <div className="today-inline-error" role="alert"><span><strong>Не удалось обновить звонки</strong><small>Остальные разделы работают.</small></span><button className="today-link" onClick={() => changeScenario('normal')}>Повторить</button></div>}
           {shownQueue.length ? <div className="today-list">{shownQueue.map(item => <ActionCard key={item.id} item={item} onOpen={() => item.kind === 'unassigned' ? setSheet('assign') : openItem(item, item.kind === 'message' ? 'reply' : 'action')} onMenu={() => openItem(item)} />)}</div>
             : (!primary || scope === 'team' || filter) && (incomplete
@@ -313,14 +313,14 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
         </section>
 
         <section className="today-section" id="today-plan" aria-labelledby="plan-title">
-          <h2 id="plan-title" className="today-h2">{scope === 'team' ? 'Задачи команды' : 'Запланировано сегодня'}</h2>
-          {openTasks.length ? <ul className="today-tasks">{openTasks.map(task => <li key={task.id}>
+          <div className="today-row"><h2 id="plan-title" className="today-h2">{scope === 'team' ? 'Задачи команды' : 'План дня'}</h2><button className="today-link" onClick={() => setSheet('plan')}>Весь план · {todayTasks.length}</button></div>
+          {openTasks.length ? <ul className="today-tasks">{openTasks.slice(0, 3).map(task => <li key={task.id}>
             <span className="today-time">{task.time}</span>
             <span className="today-task-text"><button className="today-task-open" onClick={() => openTask(task)}>{task.title}</button><small>{task.context}</small><small className="today-state">{task.state}</small></span>
             <button className="today-check" aria-label={`Отметить выполненной: ${task.title}`} onClick={() => toggleTask(task)}><Check size={16} /></button>
           </li>)}</ul> : <Empty title="На сегодня задач нет" text={futureTasks.length ? 'Будущие контакты показаны ниже.' : 'Добавьте следующий контакт, чтобы помнить о договорённости.'} cta="Создать задачу" onClick={() => { setCurrent(null); setAddType('task'); setSheet('add'); }} />}
-          {overdueTasks.length > 0 && <details className="today-done" open><summary>Просроченные задачи · {overdueTasks.length}</summary><DatedTasks tasks={overdueTasks} onToggle={toggleTask} onOpen={openTask}/></details>}
-          {futureTasks.length > 0 && <details className="today-done" open><summary>Запланировано позже · {futureTasks.length}</summary><DatedTasks tasks={futureTasks} onToggle={toggleTask} onOpen={openTask}/></details>}
+          {overdueTasks.length > 0 && <details className="today-done"><summary>Просроченные задачи · {overdueTasks.length}</summary><DatedTasks tasks={overdueTasks} onToggle={toggleTask} onOpen={openTask}/></details>}
+          {futureTasks.length > 0 && <details className="today-done"><summary>Запланировано позже · {futureTasks.length}</summary><DatedTasks tasks={futureTasks} onToggle={toggleTask} onOpen={openTask}/></details>}
           {doneTasks.length > 0 && <details className="today-done" id="today-done"><summary>Выполнено сегодня · {doneTasks.length}</summary><ul className="today-tasks">{doneTasks.map(task => <li key={task.id} data-done="true">
             <span className="today-time">{task.time}</span><span className="today-task-text"><strong>{task.title}</strong><small>{task.state}</small></span>
             <button className="today-check" aria-label={`Вернуть в план: ${task.title}`} onClick={() => toggleTask(task)}><Check size={16} /></button></li>)}</ul></details>}
@@ -354,9 +354,10 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <p className="today-muted">{context}. Роль: {role === 'owner' ? 'руководитель' : role === 'agent' ? 'сотрудник' : 'самостоятельная работа'}. Выбор роли не создаёт агентство и не предоставляет доступ к чужим данным.</p>
           <button className="today-option" onClick={() => { setSheet(null); onChannels(); }}>Рабочие каналы<ChevronRight size={18} /></button>
           <button className="today-option" onClick={() => setSheet('history')}>Журнал действий<ChevronRight size={18} /></button>
-          <p className="today-note">Объекты, показы, сделки и расширенные настройки появятся отдельными экранами на следующих этапах.</p>
+          <p className="today-note">Объекты, показы, сделки и расширенные настройки появятся отдельными экранами на ��ледующих этапах.</p>
         </>}
         {sheet === 'inbox' && <><h2 id="today-sheet-title" className="today-h2">Все действия Today</h2><p className="today-muted">Быстрый просмотр текущей очереди.</p>{list.map(item => <ActionCard key={item.id} item={item} onOpen={() => openItem(item)} onMenu={() => openItem(item)}/>)}{!list.length && <p className="today-muted">Открытых действий нет.</p>}</>}
+        {sheet === 'plan' && <><h2 id="today-sheet-title" className="today-h2">Весь план · {todayTasks.length}</h2>{[['Просрочено', overdueTasks], ['Сегодня', openTasks], ['Позже', futureTasks], ['Выполнено сегодня', doneTasks]].map(([label, group]) => <section key={label as string}><h3 className="today-label">{label as string} · {(group as Task[]).length}</h3>{(group as Task[]).length ? <DatedTasks tasks={group as Task[]} onToggle={toggleTask} onOpen={openTask}/> : <p className="today-muted">Нет задач в этой группе.</p>}</section>)}</>}
         {sheet === 'clients' && <><h2 id="today-sheet-title" className="today-h2">Клиенты в этом сеансе</h2><p className="today-muted">Быстрый список Today · данные до перезагрузки.</p>{clients.filter(client => client.scope === 'mine' || (isOwner && sample && scope === 'team')).map(client => <button className="today-option" key={client.id} onClick={() => { setClientId(client.id); setCurrent(null); setSheet('client'); }}><span><strong>{client.name}</strong><small>{client.request || 'Запрос не указан'}</small></span><ChevronRight size={18}/></button>)}<button className="today-secondary" onClick={() => { setCurrent(null); setAddType('client'); setSheet('add'); }}>Добавить клиента</button></>}
         {sheet === 'client' && <><h2 id="today-sheet-title" className="today-h2">{client?.name || 'Клиент ещё не связан'}</h2>{client ? <><p className="today-muted">{client.request || 'Запрос не указан'}</p><button className="today-secondary" onClick={() => { setCurrent(null); setForm({ title: '', detail: client.name, date: workspaceDate(), time: '', clientId: client.id }); setAddType('task'); setSheet('add'); }}>Создать следующий контакт</button><h3 className="today-label">История клиента</h3><History entries={history.filter(entry => entry.clientId === client.id)}/></> : <><p className="today-muted">Обращение не связано с существующей карточкой. Проверьте данные перед созданием клиента.</p><button className="today-primary" onClick={() => { setForm({ title: current?.context.split(' · ')[0] ?? '', detail: current?.note ?? '', date: '', time: '', clientId: '' }); setAddType('client'); setSheet('add'); }}>Создать клиента из обращения</button></>}</>}
         {sheet === 'history' && <><h2 id="today-sheet-title" className="today-h2">Журнал действий</h2><p className="today-muted">Результаты, отмеченные вами в текущем демо-сеансе.</p><History entries={history.filter(entry => (entry.scope ?? 'mine') === 'mine' || (isOwner && scope === 'team' && sample))}/></>}
@@ -468,7 +469,7 @@ function Empty({ title, text, cta, onClick }: { title: string; text: string; cta
 }
 
 function EmptyNew({ onAdd, onChannels, connected }: { onAdd: () => void; onChannels: () => void; connected: boolean }) {
-  return <div className="today-empty today-empty-new"><UserPlus size={30} /><strong>{connected ? 'Новых обращений пока нет' : 'Ваш рабочий день начинается здесь'}</strong><p>{connected ? 'Демо-канал настроен. Реальные события не поступают; можно начать с клиента вручную.' : 'Добавьте первого клиента или подключите рабочий канал, чтобы управлять обращениями и следующими действиями.'}</p><button className="today-primary" onClick={onAdd}>Добавить клиента</button><button className="today-secondary" onClick={onChannels}>{connected ? 'Открыть подключения' : 'Подключить канал'}</button></div>;
+  return <div className="today-empty today-empty-new"><UserPlus size={30} /><strong>{connected ? 'Новых обращений пока нет' : 'Ваш рабочий день начинается здес��'}</strong><p>{connected ? 'Демо-канал настроен. Реальные события не поступают; можно начать с клиента вручную.' : 'Добавьте первого клиента или подключите рабочий канал, чтобы управлять обращениями и следующими действиями.'}</p><button className="today-primary" onClick={onAdd}>Добавить клиента</button><button className="today-secondary" onClick={onChannels}>{connected ? 'Открыть подключения' : 'Подключить канал'}</button></div>;
 }
 
 function DatedTasks({ tasks, onToggle, onOpen }: { tasks: Task[]; onToggle: (task: Task) => void; onOpen: (task: Task) => void }) {
