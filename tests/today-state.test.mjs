@@ -7,6 +7,12 @@ const now = '2026-10-26T19:30:00.000Z'; // 27 October, 00:30 in Tashkent.
 const item = { id: 'a1', kind: 'overdue', scope: 'mine', title: 'Позвонить', context: 'Клиент №128', source: 'Вручную', type: 'Контакт', time: 'Вчера', note: '', cta: 'Открыть', reason: '', due: 0, rank: 0, clientId: 'c1' };
 const seed = () => createWorkspace({ items: [item], clients: [{ id: 'c1', name: 'Азиз', request: 'Аренда', scope: 'mine' }] });
 
+test('team attention metrics open the matching work list', () => {
+  assert.equal(typeof workspaceModel.teamMetricDestination, 'function');
+  assert.equal(workspaceModel.teamMetricDestination('unassigned'), 'assign');
+  assert.equal(workspaceModel.teamMetricDestination('overdue'), 'plan');
+});
+
 test('a client linked after an inquiry sees its original history exactly once', () => {
   const inquiry = { ...item, id: 'lead', clientId: undefined };
   const created = reduceWorkspace(createWorkspace(), { type: 'addLead', item: inquiry }, now);

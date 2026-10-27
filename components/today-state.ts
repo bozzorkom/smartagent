@@ -102,6 +102,10 @@ export function taskDay(task: Pick<Task, 'done' | 'dueAt'>, now = new Date().toI
   return day < today ? 'overdue' : day > today ? 'future' : 'today';
 }
 
+export function teamMetricDestination(metric: 'unassigned' | 'overdue'): 'assign' | 'plan' {
+  return metric === 'unassigned' ? 'assign' : 'plan';
+}
+
 export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now = new Date().toISOString()): Workspace {
   const record = (entityId: string, title: string, detail: Partial<Activity> = {}) =>
     [{ id: `${now}-${state.history.length}`, entityId, at: now, title, scope: state.items.find(item => item.id === entityId)?.scope ?? state.tasks.find(task => task.id === entityId)?.scope ?? 'mine', ...detail }, ...state.history];
