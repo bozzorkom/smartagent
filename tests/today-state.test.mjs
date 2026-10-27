@@ -168,15 +168,27 @@ test('the next dated task today becomes primary when the inquiry queue is empty'
 });
 
 test('Today task summary excludes overdue, future-day and completed tasks', () => {
-  assert.equal(typeof workspaceModel.todayTaskCount, 'function');
-  if (typeof workspaceModel.todayTaskCount !== 'function') return;
+  assert.equal(typeof workspaceModel.taskSummaryCounts, 'function');
+  if (typeof workspaceModel.taskSummaryCounts !== 'function') return;
   const tasks = [
     { done: false, dueAt: '2026-10-27T11:29' },
     { done: false, dueAt: '2026-10-27T11:31' },
     { done: false, dueAt: '2026-10-28T10:00' },
     { done: true, dueAt: '2026-10-27T12:00' },
   ];
-  assert.equal(workspaceModel.todayTaskCount(tasks, '2026-10-27T06:30:00.000Z'), 1);
+  assert.equal(workspaceModel.taskSummaryCounts(tasks, '2026-10-27T06:30:00.000Z').today, 1);
+});
+
+test('task summary keeps today and overdue counts separate', () => {
+  assert.equal(typeof workspaceModel.taskSummaryCounts, 'function');
+  if (typeof workspaceModel.taskSummaryCounts !== 'function') return;
+  const tasks = [
+    { done: false, dueAt: '2026-10-27T11:29' },
+    { done: false, dueAt: '2026-10-27T11:31' },
+    { done: false, dueAt: '2026-10-28T10:00' },
+    { done: true, dueAt: '2026-10-27T12:00' },
+  ];
+  assert.deepEqual(workspaceModel.taskSummaryCounts(tasks, '2026-10-27T06:30:00.000Z'), { today: 1, overdue: 1 });
 });
 
 test('rescheduling an existing task updates its date without duplicating or losing its client', () => {

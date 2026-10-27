@@ -102,8 +102,13 @@ export function taskDay(task: Pick<Task, 'done' | 'dueAt'>, now = new Date().toI
   return day < today || (day === today && task.dueAt < localDateTime(now)) ? 'overdue' : day > today ? 'future' : 'today';
 }
 
-export function todayTaskCount(tasks: Pick<Task, 'done' | 'dueAt'>[], now = new Date().toISOString()) {
-  return tasks.filter(task => taskDay(task, now) === 'today').length;
+export function taskSummaryCounts(tasks: Pick<Task, 'done' | 'dueAt'>[], now = new Date().toISOString()) {
+  return tasks.reduce((counts, task) => {
+    const day = taskDay(task, now);
+    if (day === 'today') counts.today += 1;
+    if (day === 'overdue') counts.overdue += 1;
+    return counts;
+  }, { today: 0, overdue: 0 });
 }
 
 export type PrimaryAttention = { source: 'item'; value: Item } | { source: 'task'; value: Task } | null;

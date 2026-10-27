@@ -14,7 +14,7 @@ import {
   byPriority, channelNames, clockNow, demoItems, demoTasks, employees, plural, problemStates, results, scenarios,
   type ChannelId, type ChannelStates, type Item, type Kind, type Scenario, type Task,
 } from './today-data';
-import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, todayTaskCount, primaryAttention, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
+import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, taskSummaryCounts, primaryAttention, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
 
 const kindIcons: Record<Kind, typeof Phone> = {
   overdue: Clock3, call: PhoneMissed, message: MessageSquare, promise: CalendarClock, review: CircleHelp,
@@ -125,6 +125,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const team = isOwner && teamData ? visible.filter(item => item.scope === 'team') : [];
   const list = scope === 'team' ? team : mine;
   const todayTasks = tasks.filter(task => (task.custom || demoData) && (task.scope ?? 'mine') === (isOwner && teamData && scope === 'team' ? 'team' : 'mine'));
+  const taskSummary = taskSummaryCounts(todayTasks);
   const primary = scope === 'mine' ? primaryAttention(mine, todayTasks) : null;
   const primaryItem = primary?.source === 'item' ? primary.value : null;
   const primaryTask = primary?.source === 'task' ? primary.value : null;
@@ -430,7 +431,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           {scope === 'mine' ? <>
             <Metric label="Без ответа" value={messaging || unanswered ? String(unanswered) : null} hint={toReview ? `+${toReview} проверить` : messaging ? 'по подтверждённым данным' : 'нет каналов сообщений'} active={filter === 'reply'} onClick={() => pickFilter('reply')} />
             <Metric label="Пропущенные" value={phoneData && !callsFailed ? String(missed) : null} hint={callsFailed?'не обновилось':scopeCalls.length?'события демо-АТС':connected.includes('phone')?'рабочая телефония':'телефония не подключена'} active={filter === 'missed'} onClick={() => pickFilter('missed')} />
-            <Metric label="Задачи" value={String(todayTaskCount(todayTasks))} hint="срок ещё сегодня" onClick={() => setSheet('plan')} />
+            <Metric label="Задачи" value={String(taskSummary.today)} hint={taskSummary.overdue ? `${taskSummary.overdue} ${plural(taskSummary.overdue, 'просроченная', 'просроченные', 'просроченных')}` : 'срок ещё сегодня'} onClick={() => setSheet('plan')} />
           </> : <>
             <Metric label="Без ответственного" value={String(unassigned.length)} hint="ожидают назначения" onClick={() => setSheet(teamMetricDestination('unassigned'))} />
             <Metric label="Просрочено" value={String(team.filter(i => i.kind === 'teamOverdue').length)} hint="задачи команды" onClick={() => setSheet(teamMetricDestination('overdue'))} />
