@@ -135,7 +135,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     if (access.offline) { setFormError('Нет сети. Изменение не сохранено; черновик остаётся в этом сеансе.'); notify('Нет сети: действие не сохранено.'); return false; }
     const before = model.current, next = reduceWorkspace(before, action);
     if (before === next) { setFormError('Изменение не сохранено. Проверьте данные и актуальность действия.'); return false; }
-    replace(next); if (close) setSheet(null); setFormError('');
+    replace(next); if (close) { if (clientReturn.current) returnToClient(true); else { setSheet(null); setFilter(null); } } setFormError('');
     notify(`${message} · в демо-сеансе`, { message, restore: () => {
       if (accessRef.current.lost || accessRef.current.offline || (targetScope === 'team' && !accessRef.current.owner)) return notify('Отмена недоступна: проверьте доступ и соединение.');
       if (model.current !== next) return notify('После этого изменения есть новые данные. Отмена недоступна.');
@@ -143,7 +143,19 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     } });
     return true;
   }
-  function closeSheet() { if (saveLock.current) return; setSheet(null); setFilter(null); setFormError(''); }
+  const clientReturn = useRef<{ id: string; scroll: number } | null>(null);
+  function leaveClient(action: () => void) {
+    clientReturn.current = { id: clientId, scroll: dialog.current?.scrollTop ?? 0 };
+    action();
+  }
+  function returnToClient(afterSave = false) {
+    const target = clientReturn.current;
+    if (!target || (saveLock.current && !afterSave)) return;
+    clientReturn.current = null;
+    setClientId(target.id); setSheet('client'); setFormError('');
+    requestAnimationFrame(() => { if (dialog.current) dialog.current.scrollTop = target.scroll; });
+  }
+  function closeSheet() { if (saveLock.current) return; if (clientReturn.current) return returnToClient(); setSheet(null); setFilter(null); setFormError(''); }
   function openClient(item?: Item) { setClientId(item?.clientId ?? ''); setCurrent(item ?? null); setSheet('client'); }
   function openTask(task: Task) { setTaskId(task.id); setDueAt(task.dueAt ?? ''); setFormError(''); setSheet('task'); }
   function loadSample() {
@@ -376,6 +388,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     <dialog ref={dialog} className={`today-dialog${sheet === 'inbox' || sheet === 'client' ? ' crm-dialog' : ''}`} aria-labelledby="today-sheet-title" onCancel={e => { e.preventDefault(); closeSheet(); }} onClick={e => { if (e.target === e.currentTarget) closeSheet(); }}>
       <div className="today-sheet">
         <span className="today-grabber" aria-hidden="true" />
+        {clientReturn.current && sheet !== 'client' && <button className="today-link" disabled={saving} onClick={() => returnToClient()}>Назад к клиенту</button>}
         <button className="today-close" aria-label="Закрыть" disabled={saving} onClick={closeSheet}><X size={20} /></button>
         {(sheet === 'profile' || sheet === 'more') && <>
           <h2 id="today-sheet-title" className="today-h2">{sheet === 'profile' ? 'Ваше прост��анство' : 'Ещё'}</h2>
@@ -387,7 +400,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
         {sheet === 'inbox' && <CrmInbox items={list} initialFilter={filter} incomplete={incomplete} phoneConnected={connected.includes('phone')} restricted={accessLost} team={scope === 'team' && isOwner} onOpen={openItem} onChannels={() => { closeSheet(); onChannels(); }} onAdd={() => { setAddType('lead'); setSheet('add'); }}/>}
         {sheet === 'plan' && <><h2 id="today-sheet-title" className="today-h2">Весь план · {todayTasks.length}</h2><p className="today-muted">Невыполненные: {pendingTasks.length} · Завершённые: {todayTasks.length - pendingTasks.length}. Счётчик на главной показывает только невыполненные.</p>{[['Просрочено', overdueTasks], ['Сегодня', openTasks], ['Позже', futureTasks], ['Без срока', undatedTasks], ['Выполнено сегодня', doneTasks], ['Выполнено ранее', archivedTasks]].map(([label, group]) => <section key={label as string}><h3 className="today-label">{label as string} · {(group as Task[]).length}</h3>{(group as Task[]).length ? <DatedTasks tasks={group as Task[]} onToggle={toggleTask} onOpen={openTask}/> : <p className="today-muted">Нет задач в этой группе.</p>}</section>)}</>}
         {sheet === 'clients' && <><h2 id="today-sheet-title" className="today-h2">Клиенты в этом сеансе</h2><p className="today-muted">Быстрый список Today · данные до перезагрузки.</p>{clients.filter(client => client.scope === 'mine' || (isOwner && sample && scope === 'team')).map(client => <button className="today-option" key={client.id} onClick={() => { setClientId(client.id); setCurrent(null); setSheet('client'); }}><span><strong>{client.name}</strong><small>{client.request || 'Запрос не указан'}</small></span><ChevronRight size={18}/></button>)}<button className="today-secondary" onClick={() => { setCurrent(null); setAddType('client'); setSheet('add'); }}>Добавить клиента</button></>}
-        {sheet === 'client' && (client ? <ClientWorkspace key={client.id} client={client} items={items.filter(item => item.clientId === client.id)} tasks={tasks.filter(task => task.clientId === client.id)} history={history.filter(entry => entry.clientId === client.id)} restricted={accessLost || (client.scope === 'team' && !isOwner)} onEdit={(name, request) => commit({ type: 'editClient', clientId: client.id, name, request }, 'Данные клиента обновлены.', false)} onNote={note => commit({ type: 'clientNote', clientId: client.id, note }, 'Заметка добавлена.', false)} onOpenItem={openItem} onOpenTask={openTask} onTask={() => { setCurrent(null); setForm({ title: '', detail: client.name, date: workspaceDate(), time: '', clientId: client.id }); setAddType('task'); setSheet('add'); }}/> : <><h2 id="today-sheet-title">Клиент ещё не связан</h2><p className="today-muted">Проверьте данные перед созданием клиента.</p><button className="today-primary" onClick={() => { setForm({ title: current?.context.split(' · ')[0] ?? '', detail: current?.note ?? '', date: '', time: '', clientId: '' }); setAddType('client'); setSheet('add'); }}>Создать клиента из обращения</button></>)}
+        {sheet === 'client' && (client ? <ClientWorkspace key={client.id} client={client} items={items.filter(item => item.clientId === client.id)} tasks={tasks.filter(task => task.clientId === client.id)} history={history.filter(entry => entry.clientId === client.id)} restricted={accessLost || (client.scope === 'team' && !isOwner)} onEdit={(name, request) => commit({ type: 'editClient', clientId: client.id, name, request }, 'Данные клиента обновлены.', false)} onNote={note => commit({ type: 'clientNote', clientId: client.id, note }, 'Заметка добавлена.', false)} onOpenItem={item => leaveClient(() => openItem(item))} onOpenTask={task => leaveClient(() => openTask(task))} onTask={() => leaveClient(() => { setCurrent(null); setForm({ title: '', detail: client.name, date: workspaceDate(), time: '', clientId: client.id }); setAddType('task'); setSheet('add'); })}/> : <><h2 id="today-sheet-title">Клиент ещё не связан</h2><p className="today-muted">Проверьте данные перед созданием клиента.</p><button className="today-primary" onClick={() => { setForm({ title: current?.context.split(' · ')[0] ?? '', detail: current?.note ?? '', date: '', time: '', clientId: '' }); setAddType('client'); setSheet('add'); }}>Создать клиента из обращения</button></>)}
         {sheet === 'history' && <><h2 id="today-sheet-title" className="today-h2">Журнал действий</h2><p className="today-muted">Результаты, отмеченные вами в текущем демо-сеансе.</p><History entries={history.filter(entry => (entry.scope ?? 'mine') === 'mine' || (isOwner && scope === 'team' && sample))}/></>}
         {sheet === 'task' && selectedTask && <><h2 id="today-sheet-title" className="today-h2">{selectedTask.title}</h2><p className="today-muted">{selectedTask.context}</p><p className="today-note">{selectedTask.state} · {selectedTask.dueAt?.replace('T', ', ')}</p><form onSubmit={e => { e.preventDefault(); commit({ type: 'rescheduleTask', taskId, dueAt }, 'Новый срок задачи сохранён'); }}><label className="today-label" htmlFor="task-due">Новый срок</label><input id="task-due" required type="datetime-local" min={localDateTime()} value={dueAt} onInput={e => setDueAt(e.currentTarget.value)}/><button type="submit" className="today-primary">Перенести задачу</button></form><button className="today-secondary" onClick={() => commit({ type: 'toggleTask', taskId }, 'Задача отмечена выполненной')}>Отметить выполненной</button></>}
 
