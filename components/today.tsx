@@ -40,7 +40,6 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const [dueAt, setDueAt] = useState('');
   const saveLock = useRef(false);
   const [filter, setFilter] = useState<Filter>(null);
-  const [showAll, setShowAll] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [current, setCurrent] = useState<Item | null>(null);
@@ -130,7 +129,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     } });
     return true;
   }
-  function closeSheet() { if (saveLock.current) return; setSheet(null); setFormError(''); }
+  function closeSheet() { if (saveLock.current) return; setSheet(null); setFilter(null); setFormError(''); }
   function openClient(item?: Item) { setClientId(item?.clientId ?? ''); setCurrent(item ?? null); setSheet('client'); }
   function openTask(task: Task) { setTaskId(task.id); setDueAt(task.dueAt ?? ''); setFormError(''); setSheet('task'); }
   function loadSample() {
@@ -218,16 +217,15 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   }
 
   function pickFilter(next: Filter) {
-    setFilter(f => f === next ? null : next); setShowAll(false);
-    later(() => queueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
+    setFilter(next); setSheet('inbox');
   }
 
   const context = scope === 'team' && isOwner && sample ? 'Команда · демонстрационный пример' : 'Личное демо-пространство';
 
   const status = problems.length
-    ? { title: `${problems.length} ${plural(problems.length, 'канал требует', 'канала требуют', 'каналов требуют')} внимания`, caption: problems.map(id => channelNames[id]).join(', ') + ' · данные могут быть неполными', cta: 'Проверить', warn: true }
+    ? { title: `${problems.length} ${plural(problems.length, 'канал требует', 'канала требуют', 'каналов требуют')} внимания`, caption: problems.map(id => channelNames[id]).join(', ') + ' · данны�� могут быть неполными', cta: 'Проверить', warn: true }
     : delayed ? { title: 'Обновление Telegram задерживается', caption: 'Некоторые новые сообщения могут появиться позже.', cta: 'Проверить', warn: true }
-    : connected.length ? { title: 'Демо-каналы настроены', caption: 'Подключения имитируются. Реальные звонки и сообщения не поступают.', cta: '', warn: false }
+    : connected.length ? { title: 'Демо-каналы настр��ены', caption: 'Подключения имитируются. Реальные звонки и сообщения не поступают.', cta: '', warn: false }
     : channels.phone === 'manual' ? { title: 'Ручной учёт обращений', caption: 'Автоматические источники пока не подключены.', cta: 'Подключить', warn: false }
     : { title: 'Подключите рабочие каналы', caption: 'Звонки и сообщения из подключённых источников смогут появляться здесь.', cta: 'Настроить', warn: false };
 
@@ -279,7 +277,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           {scope === 'mine' ? <>
             <Metric label="Без ответа" value={messaging || unanswered ? String(unanswered) : null} hint={toReview ? `+${toReview} проверить` : messaging ? 'по подтверждённым данным' : 'нет каналов сообщений'} active={filter === 'reply'} onClick={() => pickFilter('reply')} />
             <Metric label="Пропущенные" value={connected.includes('phone') && !callsFailed ? String(missed) : null} hint={connected.includes('phone') ? (callsFailed ? 'не обновилось' : 'рабочая телефония') : 'телефония не подключена'} active={filter === 'missed'} onClick={() => pickFilter('missed')} />
-            <Metric label="Задачи" value={String(openTasks.length)} hint={overdueCount ? `ещё ${overdueCount} просрочено` : 'на сегодня'} onClick={() => document.getElementById('today-plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+            <Metric label="Задачи" value={String(openTasks.length)} hint={overdueCount ? `ещё ${overdueCount} просрочено` : 'на сегодня'} onClick={() => setSheet('plan')} />
           </> : <>
             <Metric label="Без ответственного" value={String(unassigned.length)} hint="ожидают назначения" />
             <Metric label="Просрочено" value={String(team.filter(i => i.kind === 'teamOverdue').length)} hint="задачи команды" />
@@ -354,9 +352,9 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <p className="today-muted">{context}. Роль: {role === 'owner' ? 'руководитель' : role === 'agent' ? 'сотрудник' : 'самостоятельная работа'}. Выбор роли не создаёт агентство и не предоставляет доступ к чужим данным.</p>
           <button className="today-option" onClick={() => { setSheet(null); onChannels(); }}>Рабочие каналы<ChevronRight size={18} /></button>
           <button className="today-option" onClick={() => setSheet('history')}>Журнал действий<ChevronRight size={18} /></button>
-          <p className="today-note">Объекты, показы, сделки и расширенные настройки появятся отдельными экранами на ��ледующих этапах.</p>
+          <p className="today-note">Объекты, показы, сделки и расшире��ные настройки появятся отдельными экранами на ��ледующих этапах.</p>
         </>}
-        {sheet === 'inbox' && <><h2 id="today-sheet-title" className="today-h2">Все действия Today</h2><p className="today-muted">Быстрый просмотр текущей очереди.</p>{list.map(item => <ActionCard key={item.id} item={item} onOpen={() => openItem(item)} onMenu={() => openItem(item)}/>)}{!list.length && <p className="today-muted">Открытых действий нет.</p>}</>}
+        {sheet === 'inbox' && <><h2 id="today-sheet-title" className="today-h2">{filter === 'reply' ? 'Без ответа' : filter === 'missed' ? 'Пропущенные' : 'Все действия Today'} · {list.filter(matches).length}</h2><p className="today-muted">Полный список по доступным данным. Открытие карточки не завершает действие.</p><div className="today-row"><button className="today-link" onClick={() => setFilter(null)} aria-pressed={!filter}>Все</button><button className="today-link" onClick={() => setFilter('reply')} aria-pressed={filter === 'reply'}>Без ответа</button><button className="today-link" onClick={() => setFilter('missed')} aria-pressed={filter === 'missed'}>Пропущенные</button></div>{incomplete && <p className="today-note">Данные могут быть неполными. Проверьте состояние источников.</p>}{filter === 'missed' && !connected.includes('phone') && <p className="today-note">Рабочая телефония не подключена. Отсутствие событий не означает отсутствие звонков.</p>}{list.filter(matches).map(item => <ActionCard key={item.id} item={item} onOpen={() => openItem(item)} onMenu={() => openItem(item)}/>)}{!list.filter(matches).length && <p className="today-muted">По выбранному фильтру доступных действий нет.</p>}</>}
         {sheet === 'plan' && <><h2 id="today-sheet-title" className="today-h2">Весь план · {todayTasks.length}</h2>{[['Просрочено', overdueTasks], ['Сегодня', openTasks], ['Позже', futureTasks], ['Выполнено сегодня', doneTasks]].map(([label, group]) => <section key={label as string}><h3 className="today-label">{label as string} · {(group as Task[]).length}</h3>{(group as Task[]).length ? <DatedTasks tasks={group as Task[]} onToggle={toggleTask} onOpen={openTask}/> : <p className="today-muted">Нет задач в этой группе.</p>}</section>)}</>}
         {sheet === 'clients' && <><h2 id="today-sheet-title" className="today-h2">Клиенты в этом сеансе</h2><p className="today-muted">Быстрый список Today · данные до перезагрузки.</p>{clients.filter(client => client.scope === 'mine' || (isOwner && sample && scope === 'team')).map(client => <button className="today-option" key={client.id} onClick={() => { setClientId(client.id); setCurrent(null); setSheet('client'); }}><span><strong>{client.name}</strong><small>{client.request || 'Запрос не указан'}</small></span><ChevronRight size={18}/></button>)}<button className="today-secondary" onClick={() => { setCurrent(null); setAddType('client'); setSheet('add'); }}>Добавить клиента</button></>}
         {sheet === 'client' && <><h2 id="today-sheet-title" className="today-h2">{client?.name || 'Клиент ещё не связан'}</h2>{client ? <><p className="today-muted">{client.request || 'Запрос не указан'}</p><button className="today-secondary" onClick={() => { setCurrent(null); setForm({ title: '', detail: client.name, date: workspaceDate(), time: '', clientId: client.id }); setAddType('task'); setSheet('add'); }}>Создать следующий контакт</button><h3 className="today-label">История клиента</h3><History entries={history.filter(entry => entry.clientId === client.id)}/></> : <><p className="today-muted">Обращение не связано с существующей карточкой. Проверьте данные перед созданием клиента.</p><button className="today-primary" onClick={() => { setForm({ title: current?.context.split(' · ')[0] ?? '', detail: current?.note ?? '', date: '', time: '', clientId: '' }); setAddType('client'); setSheet('add'); }}>Создать клиента из обращения</button></>}</>}
