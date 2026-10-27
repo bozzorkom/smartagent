@@ -22,9 +22,10 @@ export type Item = {
   custom?: boolean;
   clientId?: string;
   assignee?: string;
+  callId?: string;
 };
 
-export type Task = { id: string; time: string; title: string; context: string; state: string; done: boolean; custom?: boolean; dueAt?: string; clientId?: string; completedAt?: string; scope?: 'mine' | 'team' };
+export type Task = { id: string; time: string; title: string; context: string; state: string; done: boolean; custom?: boolean; dueAt?: string; clientId?: string; completedAt?: string; scope?: 'mine' | 'team'; callId?: string };
 
 export const channelNames: Record<ChannelId, string> = {
   phone: 'Телефония',

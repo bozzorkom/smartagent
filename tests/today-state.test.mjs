@@ -1,10 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspace, reduceWorkspace, taskDay, workspaceDate } from '../components/today-state.ts';
+import * as workspaceModel from '../components/today-state.ts';
 
 const now = '2026-10-26T19:30:00.000Z'; // 27 October, 00:30 in Tashkent.
 const item = { id: 'a1', kind: 'overdue', scope: 'mine', title: 'Позвонить', context: 'Клиент №128', source: 'Вручную', type: 'Контакт', time: 'Вчера', note: '', cta: 'Открыть', reason: '', due: 0, rank: 0, clientId: 'c1' };
 const seed = () => createWorkspace({ items: [item], clients: [{ id: 'c1', name: 'Азиз', request: 'Аренда', scope: 'mine' }] });
+
+test('a client linked after an inquiry sees its original history exactly once', () => {
+  const inquiry = { ...item, id: 'lead', clientId: undefined };
+  const created = reduceWorkspace(createWorkspace(), { type: 'addLead', item: inquiry }, now);
+  const linked = reduceWorkspace(created, { type: 'addClient', id: 'new-client', name: 'Мадина', request: '', itemId: 'lead' }, '2026-10-26T19:31:00.000Z');
+  assert.equal(typeof workspaceModel.clientHistory, 'function');
+  const history = workspaceModel.clientHistory(linked, 'new-client');
+  assert.deepEqual(history.map(entry => entry.title), ['Клиент добавлен', 'Обращение добавлено вручную']);
+  assert.equal(new Set(history.map(entry => entry.id)).size, 2);
+  assert.equal(created.history[0].clientId, undefined);
+});
+
+test('client history never infers a link across scopes or an explicit different client', () => {
+  const state = seed();
+  state.history = [
+    { id: 'own', entityId: 'a1', at: now, title: 'Связано', scope: 'mine' },
+    { id: 'team', entityId: 'a1', at: now, title: 'Команда', scope: 'team' },
+    { id: 'other', entityId: 'a1', clientId: 'different', at: now, title: 'Другой клиент', scope: 'mine' },
+  ];
+  assert.equal(typeof workspaceModel.clientHistory, 'function');
+  assert.deepEqual(workspaceModel.clientHistory(state, 'c1').map(entry => entry.id), ['own']);
+  assert.deepEqual(workspaceModel.clientHistory(state, 'missing'), []);
+});
 
 test('client edits preserve identity and record client history', () => {
   const state = seed();
@@ -13,6 +37,15 @@ test('client edits preserve identity and record client history', () => {
   assert.equal(next.items[0].clientId, 'c1');
   assert.equal(next.history[0].clientId, 'c1');
   assert.equal(reduceWorkspace(next, { type: 'editClient', clientId: 'c1', name: ' ', request: '' }, now), next);
+});
+
+test('team inquiry and task creation stay out of the personal activity journal', () => {
+  const initial = createWorkspace({ clients: [{ id: 'team-client', name: 'Командный клиент', request: '', scope: 'team' }] });
+  const lead = reduceWorkspace(initial, { type: 'addLead', item: { ...item, id: 'team-lead', scope: 'team', clientId: 'team-client' } }, now);
+  const state = reduceWorkspace(lead, { type: 'addTask', task: { id: 'team-task', title: 'Контакт', context: '', state: 'Создано', done: false, time: '14:00', dueAt: '2026-10-27T14:00', scope: 'team', clientId: 'team-client' } }, '2026-10-26T19:32:00.000Z');
+  assert.deepEqual(state.history.map(entry => entry.scope), ['team', 'team']);
+  assert.equal(state.history.filter(entry => (entry.scope ?? 'mine') === 'mine').length, 0);
+  assert.equal(workspaceModel.clientHistory(state, 'team-client').length, 2);
 });
 
 test('client notes reject blank or unknown clients and retain scope', () => {
