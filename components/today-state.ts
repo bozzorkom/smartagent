@@ -102,6 +102,22 @@ export function taskDay(task: Pick<Task, 'done' | 'dueAt'>, now = new Date().toI
   return day < today || (day === today && task.dueAt < localDateTime(now)) ? 'overdue' : day > today ? 'future' : 'today';
 }
 
+export type PrimaryAttention = { source: 'item'; value: Item } | { source: 'task'; value: Task } | null;
+
+export function primaryAttention(items: Item[], tasks: Task[], now = new Date().toISOString()): PrimaryAttention {
+  const item = [...items].sort((a, b) => a.rank - b.rank || a.due - b.due || a.id.localeCompare(b.id))[0];
+  const task = tasks
+    .filter(value => ['overdue', 'today'].includes(taskDay(value, now)))
+    .sort((a, b) => a.dueAt!.localeCompare(b.dueAt!) || a.id.localeCompare(b.id))[0];
+  if (!task) return item ? { source: 'item', value: item } : null;
+  if (!item) return { source: 'task', value: task };
+  const taskRank = taskDay(task, now) === 'overdue' ? 0 : 3;
+  const start = new Date(`${workspaceDate(now)}T00:00:00+05:00`).getTime();
+  const taskDue = (new Date(`${task.dueAt}:00+05:00`).getTime() - start) / 60000;
+  const taskFirst = taskRank < item.rank || (taskRank === item.rank && (taskDue < item.due || (taskDue === item.due && task.id.localeCompare(item.id) < 0)));
+  return taskFirst ? { source: 'task', value: task } : { source: 'item', value: item };
+}
+
 export function teamMetricDestination(metric: 'unassigned' | 'overdue'): 'assign' | 'plan' {
   return metric === 'unassigned' ? 'assign' : 'plan';
 }

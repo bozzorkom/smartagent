@@ -151,6 +151,22 @@ test('a task whose time has passed today is overdue in Tashkent', () => {
   assert.equal(taskDay({ done: false, dueAt: '2026-10-27T11:29' }, '2026-10-27T06:30:00.000Z'), 'overdue');
 });
 
+test('an overdue dated task can become the primary attention action', () => {
+  assert.equal(typeof workspaceModel.primaryAttention, 'function');
+  if (typeof workspaceModel.primaryAttention !== 'function') return;
+  const task = { id: 't1', title: 'Ранний контакт', context: '', state: 'Запланировано', time: '00:10', dueAt: '2026-10-27T00:10', done: false };
+  const primary = workspaceModel.primaryAttention([{ ...item, id: 'later', due: 570 }], [task], now);
+  assert.equal(primary?.source, 'task');
+  assert.equal(primary?.value.id, 't1');
+});
+
+test('the next dated task today becomes primary when the inquiry queue is empty', () => {
+  const task = { id: 't2', title: 'Ближайшая задача', context: '', state: 'Запланировано', time: '11:30', dueAt: '2026-10-27T11:30', done: false };
+  const primary = workspaceModel.primaryAttention([], [task], now);
+  assert.equal(primary?.source, 'task');
+  assert.equal(primary?.value.id, 't2');
+});
+
 test('rescheduling an existing task updates its date without duplicating or losing its client', () => {
   const state = createWorkspace({ tasks: [{ id: 't1', title: 'Контакт', context: 'Азиз', clientId: 'c1', state: 'Запланировано', done: false, time: '14:00', dueAt: '2026-10-27T14:00' }] });
   const next = reduceWorkspace(state, { type: 'rescheduleTask', taskId: 't1', dueAt: '2026-10-29T12:00' }, now);

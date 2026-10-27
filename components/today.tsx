@@ -14,7 +14,7 @@ import {
   byPriority, channelNames, clockNow, demoItems, demoTasks, employees, plural, problemStates, results, scenarios,
   type ChannelId, type ChannelStates, type Item, type Kind, type Scenario, type Task,
 } from './today-data';
-import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
+import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, primaryAttention, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
 
 const kindIcons: Record<Kind, typeof Phone> = {
   overdue: Clock3, call: PhoneMissed, message: MessageSquare, promise: CalendarClock, review: CircleHelp,
@@ -124,12 +124,15 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const mine = visible.filter(item => item.scope === 'mine');
   const team = isOwner && teamData ? visible.filter(item => item.scope === 'team') : [];
   const list = scope === 'team' ? team : mine;
-  const [primary, ...rest] = scope === 'mine' ? mine : [];
+  const todayTasks = tasks.filter(task => (task.custom || demoData) && (task.scope ?? 'mine') === (isOwner && teamData && scope === 'team' ? 'team' : 'mine'));
+  const primary = scope === 'mine' ? primaryAttention(mine, todayTasks) : null;
+  const primaryItem = primary?.source === 'item' ? primary.value : null;
+  const primaryTask = primary?.source === 'task' ? primary.value : null;
+  const rest = primaryItem ? mine.filter(item => item.id !== primaryItem.id) : mine;
   const filtered = (scope === 'mine' ? rest : team).filter(item =>
     filter === 'reply' ? item.kind === 'message' : filter === 'missed' ? item.kind === 'call' : true);
-  const queue = filter ? (scope === 'mine' ? mine : team).filter(item => filtered.includes(item) || (primary && item.id === primary.id && matches(item))) : filtered;
+  const queue = filter ? (scope === 'mine' ? mine : team).filter(item => filtered.includes(item) || (primaryItem && item.id === primaryItem.id && matches(item))) : filtered;
   const shownQueue = queue.slice(0, 3);
-  const todayTasks = tasks.filter(task => (task.custom || demoData) && (task.scope ?? 'mine') === (isOwner && teamData && scope === 'team' ? 'team' : 'mine'));
   const openTasks = todayTasks.filter(task => taskDay(task) === 'today').sort((a, b) => a.dueAt.localeCompare(b.dueAt));
   const futureTasks = todayTasks.filter(task => taskDay(task) === 'future').sort((a, b) => a.dueAt.localeCompare(b.dueAt));
   const overdueTasks = todayTasks.filter(task => taskDay(task) === 'overdue');
@@ -438,7 +441,9 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
 
         {scope === 'mine' && primary && !filter && <section className="today-section" aria-labelledby="start-title">
           <h2 id="start-title" className="today-h2">Начните с этого</h2>
-          <ActionCard item={primary} hero onOpen={() => openItem(primary)} onMenu={() => openItem(primary)} />
+          {primaryItem
+            ? <ActionCard item={primaryItem} hero onOpen={() => openItem(primaryItem)} onMenu={() => openItem(primaryItem)} />
+            : primaryTask && <TaskActionCard task={primaryTask} onOpen={() => openTask(primaryTask)} />}
           {scenario !== 'noAi' && mine.find(i => i.id === 'p32') && <div className="today-ai"><Sparkles size={17} /><div><strong>Подсказка SuperApp</strong><p>Вы обещали отправить подборку клиенту №32. Можно начать с короткого сообщения.</p><button className="today-link" onClick={() => openItem(mine.find(i => i.id === 'p32')!, 'reply')}>Подготовить ответ</button></div></div>}
           {scenario === 'noAi' && <p className="today-note">Подсказки временно недоступны. Задачи и события работают как обычно.</p>}
         </section>}
@@ -621,6 +626,21 @@ function ActionCard({ item, hero, opened, onOpen, onMenu }: { item: Item; hero?:
     <p className="today-explain">{item.note}</p>
     <p className="today-source">{item.source} · {item.time}{(opened || item.status) && <> · <span>{opened || item.status}</span></>}</p>
     <button className={hero ? 'today-primary' : 'today-cta'} onClick={onOpen}>{item.cta}{!hero && <ChevronRight size={16} />}</button>
+  </article>;
+}
+
+function TaskActionCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
+  const overdue = taskDay(task) === 'overdue';
+  return <article className="today-card today-hero">
+    <div className="today-card-top">
+      <span className="today-type">{overdue ? <AlarmClock size={15} /> : <CalendarClock size={15} />}{overdue ? 'Просроченная задача' : 'Задача на сегодня'}</span>
+      <button className="today-menu" aria-label={`Действия: ${task.title}, ${task.context}`} onClick={onOpen}><MoreHorizontal size={19} /></button>
+    </div>
+    <h3>{task.title}</h3>
+    <p className="today-meta">{task.context}</p>
+    <p className="today-explain">{overdue ? 'Назначенный срок прошёл. Выполнение не отмечено.' : 'Это ближайшее согласованное действие по текущей очереди.'}</p>
+    <p className="today-source">{task.state} · {task.dueAt?.replace('T', ', ')} · время Ташкента</p>
+    <button className="today-primary" onClick={onOpen}>Открыть задачу</button>
   </article>;
 }
 
