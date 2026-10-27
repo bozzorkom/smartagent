@@ -6,6 +6,24 @@ const now = '2026-10-26T19:30:00.000Z'; // 27 October, 00:30 in Tashkent.
 const item = { id: 'a1', kind: 'overdue', scope: 'mine', title: 'Позвонить', context: 'Клиент №128', source: 'Вручную', type: 'Контакт', time: 'Вчера', note: '', cta: 'Открыть', reason: '', due: 0, rank: 0, clientId: 'c1' };
 const seed = () => createWorkspace({ items: [item], clients: [{ id: 'c1', name: 'Азиз', request: 'Аренда', scope: 'mine' }] });
 
+test('client edits preserve identity and record client history', () => {
+  const state = seed();
+  const next = reduceWorkspace(state, { type: 'editClient', clientId: 'c1', name: ' Азиз Алиев ', request: ' Покупка ' }, now);
+  assert.equal(next.clients[0].name, 'Азиз Алиев');
+  assert.equal(next.items[0].clientId, 'c1');
+  assert.equal(next.history[0].clientId, 'c1');
+  assert.equal(reduceWorkspace(next, { type: 'editClient', clientId: 'c1', name: ' ', request: '' }, now), next);
+});
+
+test('client notes reject blank or unknown clients and retain scope', () => {
+  const state = seed();
+  assert.equal(reduceWorkspace(state, { type: 'clientNote', clientId: 'missing', note: 'Текст' }, now), state);
+  assert.equal(reduceWorkspace(state, { type: 'clientNote', clientId: 'c1', note: ' ' }, now), state);
+  const next = reduceWorkspace(state, { type: 'clientNote', clientId: 'c1', note: ' Позвонить завтра ' }, now);
+  assert.equal(next.history[0].note, 'Позвонить завтра');
+  assert.equal(next.history[0].clientId, 'c1');
+});
+
 test('replayed events never reopen a resolved action or duplicate history', () => {
   const closed = reduceWorkspace(seed(), { type: 'outcome', itemId: item.id, outcome: 'Связались', note: 'Готово' }, now);
   assert.equal(reduceWorkspace(closed, { type: 'receive', item }, now), closed);

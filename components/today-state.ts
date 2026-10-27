@@ -5,6 +5,8 @@ export type Activity = { id: string; entityId: string; at: string; title: string
 export type Workspace = { items: Item[]; tasks: Task[]; clients: Client[]; history: Activity[]; resolved: string[]; drafts: Record<string, string> };
 export type WorkspaceAction =
   | { type: 'addClient'; id: string; name: string; request: string; itemId?: string }
+  | { type: 'editClient'; clientId: string; name: string; request: string }
+  | { type: 'clientNote'; clientId: string; note: string }
   | { type: 'addLead'; item: Item }
   | { type: 'receive'; item: Item }
   | { type: 'addTask'; task: Task }
@@ -55,6 +57,17 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
       return { ...state, clients: [...state.clients, { id: action.id, name, request: action.request.trim(), scope: item?.scope ?? 'mine' }],
         items: state.items.map(item => item.id === action.itemId ? { ...item, clientId: action.id } : item),
         history: record(action.id, 'Клиент добавлен', { clientId: action.id, scope: item?.scope ?? 'mine' }) };
+    }
+    case 'editClient': {
+      const client = state.clients.find(value => value.id === action.clientId);
+      const name = action.name.trim(), request = action.request.trim();
+      if (!client || !name || name.length > 120 || request.length > 2000 || (name === client.name && request === client.request)) return state;
+      return { ...state, clients: state.clients.map(value => value.id === client.id ? { ...value, name, request } : value), history: record(client.id, 'Данные клиента обновлены', { clientId: client.id, scope: client.scope }) };
+    }
+    case 'clientNote': {
+      const client = state.clients.find(value => value.id === action.clientId), note = action.note.trim();
+      if (!client || !note || note.length > 2000) return state;
+      return { ...state, history: record(client.id, 'Заметка добавлена вами', { clientId: client.id, scope: client.scope, note }) };
     }
     case 'receive':
       if (state.items.some(value => value.id === action.item.id)) return state;
