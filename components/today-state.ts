@@ -99,7 +99,7 @@ export function taskDay(task: Pick<Task, 'done' | 'dueAt'>, now = new Date().toI
   if (task.done) return 'done';
   if (!task.dueAt || !validDueAt(task.dueAt)) return 'undated';
   const day = task.dueAt.slice(0, 10), today = workspaceDate(now);
-  return day < today ? 'overdue' : day > today ? 'future' : 'today';
+  return day < today || (day === today && task.dueAt < localDateTime(now)) ? 'overdue' : day > today ? 'future' : 'today';
 }
 
 export function teamMetricDestination(metric: 'unassigned' | 'overdue'): 'assign' | 'plan' {

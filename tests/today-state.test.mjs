@@ -147,6 +147,10 @@ test('workspace day uses Tashkent at the UTC date boundary', () => {
   assert.equal(taskDay({ done: true, dueAt: '2026-10-26T11:30' }, now), 'done');
 });
 
+test('a task whose time has passed today is overdue in Tashkent', () => {
+  assert.equal(taskDay({ done: false, dueAt: '2026-10-27T11:29' }, '2026-10-27T06:30:00.000Z'), 'overdue');
+});
+
 test('rescheduling an existing task updates its date without duplicating or losing its client', () => {
   const state = createWorkspace({ tasks: [{ id: 't1', title: 'Контакт', context: 'Азиз', clientId: 'c1', state: 'Запланировано', done: false, time: '14:00', dueAt: '2026-10-27T14:00' }] });
   const next = reduceWorkspace(state, { type: 'rescheduleTask', taskId: 't1', dueAt: '2026-10-29T12:00' }, now);
