@@ -14,7 +14,7 @@ import {
   byPriority, channelNames, clockNow, demoItems, demoTasks, employees, plural, problemStates, results, scenarios,
   type ChannelId, type ChannelStates, type Item, type Kind, type Scenario, type Task,
 } from './today-data';
-import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, taskSummaryCounts, teamOverdueCount, primaryAttention, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
+import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, taskSummaryCounts, teamOverdueCount, inboxItems, primaryAttention, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
 
 const kindIcons: Record<Kind, typeof Phone> = {
   overdue: Clock3, call: PhoneMissed, message: MessageSquare, promise: CalendarClock, review: CircleHelp,
@@ -124,6 +124,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const mine = visible.filter(item => item.scope === 'mine');
   const team = isOwner && teamData ? visible.filter(item => item.scope === 'team') : [];
   const list = scope === 'team' ? team : mine;
+  const inquiries = inboxItems(list);
   const todayTasks = tasks.filter(task => (task.custom || demoData) && (task.scope ?? 'mine') === (isOwner && teamData && scope === 'team' ? 'team' : 'mine'));
   const taskSummary = taskSummaryCounts(todayTasks);
   const teamOverdueItems = team.filter(item => item.kind === 'teamOverdue');
@@ -459,7 +460,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
 
         <section className="today-section" ref={queueRef} aria-labelledby="queue-title">
           <div className="today-row"><h2 id="queue-title" className="today-h2">{filter === 'reply' ? 'Без ответа' : filter === 'missed' ? 'Пропущенные' : scope === 'team' ? 'Задачи команды' : 'Требует внимания'}</h2>
-            {filter ? <button className="today-link" onClick={() => setFilter(null)}>Сбросить<X size={14} /></button> : list.length > 0 && <button className="today-link" onClick={() => setSheet('inbox')}>Все обращения · {list.length}</button>}</div>
+            {filter ? <button className="today-link" onClick={() => setFilter(null)}>Сбросить<X size={14} /></button> : inquiries.length > 0 && <button className="today-link" onClick={() => setSheet('inbox')}>Все обращения · {inquiries.length}</button>}</div>
           {callsFailed && <div className="today-inline-error" role="alert"><span><strong>Не удалось обновить звонки</strong><small>Остальные разделы работают.</small></span><button className="today-link" onClick={() => changeScenario('normal')}>Повторить</button></div>}
           {shownQueue.length ? <div className="today-list">{shownQueue.map(item => <ActionCard key={item.id} item={item} onOpen={() => item.kind === 'unassigned' ? setSheet('assign') : openItem(item, item.kind === 'message' ? 'reply' : 'action')} onMenu={() => openItem(item)} />)}</div>
             : (!primary || scope === 'team' || filter) && (incomplete

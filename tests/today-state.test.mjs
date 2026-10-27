@@ -13,6 +13,24 @@ test('team attention metrics open the matching work list', () => {
   assert.equal(workspaceModel.teamMetricDestination('overdue'), 'plan');
 });
 
+test('inbox keeps team inquiries after assignment and excludes follow-up reminders', () => {
+  assert.equal(typeof workspaceModel.inboxItems, 'function');
+  if (typeof workspaceModel.inboxItems !== 'function') return;
+  const items = [
+    item,
+    { ...item, id: 'promise', kind: 'promise', custom: true },
+    { ...item, id: 'team-task', kind: 'teamOverdue', scope: 'team' },
+    { ...item, id: 'message', kind: 'message', channel: 'telegram' },
+    { ...item, id: 'call', kind: 'call', channel: 'phone' },
+    { ...item, id: 'manual', kind: 'review', custom: true },
+    { ...item, id: 'team-lead', kind: 'unassigned', scope: 'team' },
+  ];
+  const before = createWorkspace({ items });
+  assert.deepEqual(workspaceModel.inboxItems(before.items).map(value => value.id), ['message', 'call', 'manual', 'team-lead']);
+  const assigned = reduceWorkspace(before, { type: 'assign', assignments: { 'team-lead': 'Анна' } }, now);
+  assert.deepEqual(workspaceModel.inboxItems(assigned.items).map(value => value.id), ['message', 'call', 'manual', 'team-lead']);
+});
+
 test('team overdue summary counts visible alerts and dated tasks shown in the plan', () => {
   assert.equal(typeof workspaceModel.teamOverdueCount, 'function');
   if (typeof workspaceModel.teamOverdueCount !== 'function') return;
