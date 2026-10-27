@@ -7,8 +7,13 @@ import { localDateTime } from './today-state';
 import type { Item, Task } from './today-data';
 import './client-workspace.css';
 
-type Props = { client: Client; items: Item[]; tasks: Task[]; history: Activity[]; restricted: boolean; onTask: () => void; onOpenTask: (task: Task) => void; onOpenItem: (item: Item) => void };
-export function ClientWorkspace({ client, items, tasks, history, restricted, onTask, onOpenTask, onOpenItem }: Props) {
+type Props = { client: Client; items: Item[]; tasks: Task[]; history: Activity[]; restricted: boolean; onTask: () => void; onOpenTask: (task: Task) => void; onOpenItem: (item: Item) => void; onEdit: (name: string, request: string) => boolean; onNote: (note: string) => boolean };
+export function ClientWorkspace({ client, items, tasks, history, restricted, onTask, onOpenTask, onOpenItem, onEdit, onNote }: Props) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(client.name);
+  const [request, setRequest] = useState(client.request);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
   const [filter, setFilter] = useState('Все');
   const [notice, setNotice] = useState('');
   const pending = tasks.filter(task => !task.done).sort((a, b) => (a.dueAt || '9999').localeCompare(b.dueAt || '9999'));
@@ -26,6 +31,9 @@ export function ClientWorkspace({ client, items, tasks, history, restricted, onT
     <section><h3>Объекты для клиента</h3><p className="today-muted">Модуль объектов не подключён. Подборки и рекомендации не рассчитываются.</p></section>
     <section><h3>История общения</h3><p className="today-muted">Подтверждённые записи текущего демо-сеанса.</p><div className="client-filters">{['Все', 'Задачи', 'Результаты'].map(value => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value}</button>)}</div>{entries.filter(entry => filter === 'Все' || (filter === 'Задачи' ? Boolean(tasks.find(task => task.id === entry.entityId)) : Boolean(entry.outcome))).map(entry => <article className="client-event" key={entry.id}><time>{new Date(entry.at).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent' })}</time><h4>{entry.title}</h4>{entry.outcome && <p>{entry.outcome}</p>}{entry.note && <p>{entry.note}</p>}<small>Запись демо-сеанса · Ташкент</small></article>)}{!entries.some(entry => filter === 'Все' || (filter === 'Задачи' ? tasks.some(task => task.id === entry.entityId) : entry.outcome)) && <p className="today-muted">В этой категории пока нет записей.</p>}</section>
     <details><summary>Связанные обращения · {items.length}</summary><p className="today-muted">Сохранённый контекст источников, не подтверждение нового контакта.</p>{items.map(item => <button className="client-list-row" key={item.id} onClick={() => onOpenItem(item)}>{item.title}<small>{item.source} · {item.time}</small></button>)}</details>
-    <details><summary>Дополнительные сведения</summary><p className="today-muted">Заметки, расширенное редактирование и проверка совпадений будут добавлены следующим этапом. Автоматическое объединение контактов не выполняется.</p></details>
+    <section><h3>Данные клиента</h3><button className="today-secondary" onClick={() => { setName(client.name); setRequest(client.request); setEditing(true); setError(''); }}>Редактировать данные</button>{editing && <form onSubmit={event => { event.preventDefault(); if (!name.trim()) return setError('Укажите имя клиента.'); if (onEdit(name, request)) { setEditing(false); setError(''); setNotice('Данные клиента сохранены в демо-сеансе.'); } else setError('Изменения не сохранены. Проверьте доступ, соединение и наличие изменений.'); }}><label>Имя<input className="today-input" required maxLength={120} value={name} onChange={event => setName(event.target.value)}/></label><label>Запрос<textarea className="today-textarea" maxLength={2000} value={request} onChange={event => setRequest(event.target.value)}/></label><button className="today-primary" type="submit">Сохранить данные</button><button className="today-link" type="button" onClick={() => { setEditing(false); setError(''); }}>Отменить изменения</button></form>}</section>
+    <section><h3>Заметка о клиенте</h3><form onSubmit={event => { event.preventDefault(); if (!note.trim()) return setError('Введите текст заметки.'); if (onNote(note)) { setNote(''); setError(''); setNotice('Заметка добавлена в историю клиента.'); } else setError('Заметка не сохранена. Проверьте доступ и соединение.'); }}><label>Текст заметки<textarea className="today-textarea" required maxLength={2000} value={note} onChange={event => setNote(event.target.value)} placeholder="Договорённости и важные детали"/></label><button className="today-secondary" type="submit">Добавить заметку</button></form></section>
+    {error && <p className="today-inline-error" role="alert">{error}</p>}
+    <details><summary>Дополнительные сведения</summary><p className="today-muted">Изменения хранятся в памяти демо-сеанса. Проверка совпадений пока недоступна; автоматическое объединение контактов не выполняется.</p></details>
   </div>;
 }
