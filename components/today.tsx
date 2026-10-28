@@ -6,7 +6,7 @@ import {
   UserPlus, UsersRound, WifiOff, X,
 } from 'lucide-react';
 import './today.css';
-import { CrmInbox } from './crm-inbox';
+import { CrmInbox, defaultInboxView, type InboxView } from './crm-inbox';
 import { ClientWorkspace, type ClientDraft } from './client-workspace';
 import { CallerWorkspace } from './caller-workspace';
 import { type CallCase, type CallDraft, type CallEvent, type CallStatus } from './caller-data';
@@ -44,6 +44,10 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const [refreshing, setRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState('');
   const [scope, setScope] = useState<'mine' | 'team'>('mine');
+  const [inboxViews, setInboxViews] = useState<Record<'mine' | 'team', InboxView>>(() => ({ mine: { ...defaultInboxView }, team: { ...defaultInboxView } }));
+  function updateInboxView(change: Partial<InboxView>) {
+    setInboxViews(views => ({ ...views, [scope]: { ...views[scope], ...change } }));
+  }
   const [clientId, setClientId] = useState('');
   const [clientDrafts, setClientDrafts] = useState<Record<string, ClientDraft>>({});
   const [callerId, setCallerId] = useState('');
@@ -375,6 +379,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   }
 
   function pickFilter(next: Filter) {
+    updateInboxView({ query: '', source: 'all', filter: next ?? 'all' });
     setFilter(next); setSheet('inbox');
   }
 
@@ -522,7 +527,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <button className="today-option" onClick={()=>{clientReturn.current=null;callerReturn.current=[];openCaller();}}><Phone size={18}/>Звонки и Caller ID<ChevronRight size={18}/></button>
           <p className="today-note">Объекты, показы, сделки и расширенные настройки появятся отдельными экранами на следующих этапах.</p>
         </>}
-        {sheet === 'inbox' && <CrmInbox items={list} initialFilter={filter} incomplete={incomplete} phoneConnected={phoneData} restricted={accessLost} team={scope === 'team' && isOwner} onOpen={openItem} onChannels={() => { closeSheet(); onChannels(); }} onAdd={() => openAdd('lead')}/>}
+        {sheet === 'inbox' && <CrmInbox items={list} view={inboxViews[scope]} onViewChange={updateInboxView} incomplete={incomplete} phoneConnected={phoneData} restricted={accessLost} team={scope === 'team' && isOwner} onOpen={openItem} onChannels={() => { closeSheet(); onChannels(); }} onAdd={() => openAdd('lead')}/>}
         {sheet === 'plan' && <><h2 id="today-sheet-title" className="today-h2">Весь план · {planCount}</h2><p className="today-muted">{scope === 'team' ? `Просроченные сигналы: ${planItems.length} · Датированные задачи: ${todayTasks.length}.` : `Невыполненные: ${pendingTasks.length} · Завершённые: ${todayTasks.length - pendingTasks.length}. Счётчик на главной показывает только задачи, срок которых ещё наступит сегодня.`}</p>{scope === 'team' && <section><h3 className="today-label">Просроченные действия · {planItems.length}</h3>{planItems.length ? <div className="today-list">{planItems.map(item => <ActionCard key={item.id} item={item} onOpen={() => openItem(item)} onMenu={() => openItem(item)}/>)}</div> : <p className="today-muted">Нет действий в этой группе.</p>}</section>}{[['Просрочено', overdueTasks], ['Сегодня', openTasks], ['Позже', futureTasks], ['Без срока', undatedTasks], ['Выполнено сегодня', doneTasks], ['Выполнено ранее', archivedTasks]].map(([label, group]) => <section key={label as string}><h3 className="today-label">{label as string} · {(group as Task[]).length}</h3>{(group as Task[]).length ? <DatedTasks tasks={group as Task[]} onToggle={toggleTask} onOpen={openTask}/> : <p className="today-muted">Нет задач в этой группе.</p>}</section>)}</>}
         {sheet === 'clients' && (accessLost ? <><h2 id="today-sheet-title">Доступ ограничен</h2><p className="today-muted">Список клиентов скрыт до восстановления демо-доступа.</p></> : <><h2 id="today-sheet-title" className="today-h2">Клиенты в этом сеансе</h2><p className="today-muted">Быстрый список Today · данные до перезагрузки.</p>{clients.filter(client => !client.archived && (client.scope === 'mine' || (isOwner && teamData && scope === 'team'))).map(client => <button className="today-option" key={client.id} onClick={() => { setClientId(client.id); setCurrent(null); setSheet('client'); }}><span><strong>{client.name}</strong><small>{client.request || 'Запрос не указан'}</small></span><ChevronRight size={18}/></button>)}<button className="today-secondary" onClick={() => openAdd('client')}>Добавить клиента</button></>)}
         {sheet === 'client' && (client && clientDraft ? <ClientWorkspace key={client.id} client={client} draft={clientDraft} onDraftChange={updateClientDraft} items={items.filter(item => item.clientId === client.id)} tasks={tasks.filter(task => task.clientId === client.id)} history={clientHistory(workspace, client.id)} restricted={accessLost || (client.scope === 'team' && !isOwner)} onEdit={(name, request) => commit({ type: 'editClient', clientId: client.id, name, request }, 'Данные клиента обновлены.', false)} onNote={note => commit({ type: 'clientNote', clientId: client.id, note }, 'Заметка добавлена.', false)} onOpenItem={item => leaveClient(() => openItem(item))} onWrite={item => leaveClient(() => openItem(item, 'reply'))} onOpenTask={task => leaveClient(() => openTask(task))} onTask={() => leaveClient(() => openAdd('task', { clientId: client.id }))}/> : <><h2 id="today-sheet-title">Клиент ещё не связан</h2><p className="today-muted">Проверьте данные перед созданием клиента.</p><button className="today-primary" onClick={() => openAdd('client', { item: current ?? undefined })}>Создать клиента из обращения</button></>)}

@@ -1,31 +1,34 @@
 'use client';
 
-import { useState } from 'react';
 import { Search, PhoneMissed, MessageSquare, ChevronRight, X } from 'lucide-react';
 import { channelNames, type Item } from './today-data';
 import { inboxItems, matchesInboxQuery, needsAssignee } from './today-state';
 import './crm-inbox.css';
 
 type Filter = 'all' | 'reply' | 'missed' | 'unassigned';
-export function CrmInbox({ items, initialFilter, incomplete, phoneConnected, restricted, team, onOpen, onChannels, onAdd }: { items: Item[]; initialFilter: 'reply' | 'missed' | null; incomplete: boolean; phoneConnected: boolean; restricted: boolean; team: boolean; onOpen: (item: Item) => void; onChannels: () => void; onAdd: () => void }) {
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<Filter>(initialFilter ?? 'all');
-  const [source, setSource] = useState('all');
-  const [sort, setSort] = useState('priority');
-  const [privateMode, setPrivateMode] = useState(false);
+export type InboxView = { query: string; filter: Filter; source: string; sort: string; privateMode: boolean };
+export const defaultInboxView: InboxView = { query: '', filter: 'all', source: 'all', sort: 'priority', privateMode: false };
+
+export function CrmInbox({ items, view, onViewChange, incomplete, phoneConnected, restricted, team, onOpen, onChannels, onAdd }: { items: Item[]; view: InboxView; onViewChange: (change: Partial<InboxView>) => void; incomplete: boolean; phoneConnected: boolean; restricted: boolean; team: boolean; onOpen: (item: Item) => void; onChannels: () => void; onAdd: () => void }) {
+  const { query, filter, source, sort, privateMode } = view;
+  const setQuery = (query: string) => onViewChange({ query });
+  const setFilter = (filter: Filter) => onViewChange({ filter });
+  const setSource = (source: string) => onViewChange({ source });
+  const setSort = (sort: string) => onViewChange({ sort });
+  const setPrivateMode = (privateMode: boolean) => onViewChange({ privateMode });
   const records = restricted ? [] : inboxItems(items);
   const count = (kind: Filter) => records.filter(item => kind === 'all' || (kind === 'reply' ? item.kind === 'message' : kind === 'missed' ? item.kind === 'call' : needsAssignee(item))).length;
   const shown = records.filter(item => {
     const search = matchesInboxQuery(item, query, privateMode);
     return search && (source === 'all' || (item.channel ?? 'manual') === source) && (filter === 'all' || (filter === 'reply' ? item.kind === 'message' : filter === 'missed' ? item.kind === 'call' : needsAssignee(item)));
   }).sort((a, b) => sort === 'priority' ? a.rank - b.rank || a.id.localeCompare(b.id) : a.context.localeCompare(b.context, 'ru') || a.id.localeCompare(b.id));
-  function reset() { setFilter('all'); setSource('all'); setQuery(''); }
+  function reset() { onViewChange({ filter: 'all', source: 'all', query: '' }); }
   return <section className="crm-inbox">
     <header><p className="crm-eyebrow">LEAD SHIELD · ДЕМО</p><h2 id="today-sheet-title">Входящие</h2><p className="today-muted">Звонки, сообщения и рабочие обращения</p><span className="crm-context">{team ? 'Команда' : 'Мои обращения'}</span></header>
     {restricted ? <div role="alert" className="today-note"><strong>Доступ отозван</strong><p>Содержимое и поиск недоступны. Обратитесь к администратору или восстановите демо-доступ в Today.</p></div> : <>
       <button className="crm-source" onClick={onChannels}><span><strong>{incomplete ? 'Данные могут быть неполными' : 'Рабочие источники'}</strong><small>Демо-сеанс · проверить подключения</small></span><ChevronRight size={18}/></button>
       <p className="crm-caption">Общая сводка · не зависит от поиска. Категории пересекаются.</p>
-      <div className="crm-metrics">{([['reply', 'Без ответа'], ['missed', 'Пропущенные'], [team ? 'unassigned' : 'all', team ? 'Без ответственного' : 'Открытые']] as [Filter, string][]).map(([key, label]) => <button key={key} onClick={() => { setQuery(''); setSource('all'); setFilter(key); }}><strong>{key === 'missed' && !phoneConnected ? '—' : count(key)}</strong><span>{label}</span>{key === 'missed' && !phoneConnected && <small>Нет данных канала</small>}</button>)}</div>
+      <div className="crm-metrics">{([['reply', 'Без ответа'], ['missed', 'Пропущенные'], [team ? 'unassigned' : 'all', team ? 'Без ответственного' : 'Открытые']] as [Filter, string][]).map(([key, label]) => <button key={key} onClick={() => onViewChange({ query: '', source: 'all', filter: key })}><strong>{key === 'missed' && !phoneConnected ? '—' : count(key)}</strong><span>{label}</span>{key === 'missed' && !phoneConnected && <small>Нет данных канала</small>}</button>)}</div>
       <div className="crm-search"><Search size={18}/><input aria-label="Поиск обращений" placeholder="Имя, телефон или сообщение" value={query} onChange={event => setQuery(event.target.value)}/>{query && <button aria-label="Очистить поиск" onClick={() => setQuery('')}><X size={18}/></button>}</div>
       <div className="crm-chips" aria-label="Быстрые фильтры">{([['all', 'Все'], ['reply', 'Без ответа'], ['missed', 'Пропущенные'], ...(team ? [['unassigned', 'Без ответственного']] : [])] as [Filter, string][]).map(([key, label]) => <button key={key} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}</div>
       <div className="crm-controls"><label>Источник<select value={source} onChange={event => setSource(event.target.value)}><option value="all">Все источники</option>{Object.entries(channelNames).map(([key, name]) => <option key={key} value={key}>{name}</option>)}<option value="manual">Другие источники</option></select></label><label>Сортировка<select value={sort} onChange={event => setSort(event.target.value)}><option value="priority">Сначала важные</option><option value="name">По имени</option></select></label></div>
