@@ -7,6 +7,20 @@ const now = '2026-10-26T19:30:00.000Z'; // 27 October, 00:30 in Tashkent.
 const item = { id: 'a1', kind: 'overdue', scope: 'mine', title: 'Позвонить', context: 'Клиент №128', source: 'Вручную', type: 'Контакт', time: 'Вчера', note: '', cta: 'Открыть', reason: '', due: 0, rank: 0, clientId: 'c1' };
 const seed = () => createWorkspace({ items: [item], clients: [{ id: 'c1', name: 'Азиз', request: 'Аренда', scope: 'mine' }] });
 
+test('private Inbox search ignores hidden request, note and internal identifiers', () => {
+  assert.equal(typeof workspaceModel.matchesInboxQuery, 'function');
+  if (typeof workspaceModel.matchesInboxQuery !== 'function') return;
+  const inquiry = { ...item, id: 'private-ref-87654', kind: 'review', context: 'Мадина · Аренда · Чиланзар · +998 90 123 45 67', source: 'Командный источник', note: 'Перезвонить вечером' };
+  for (const query of ['аренда', 'чиланзар', 'вечером', '87654', '+998 (90) 123-45-67']) {
+    assert.equal(workspaceModel.matchesInboxQuery(inquiry, query, false), true, `normal search: ${query}`);
+    assert.equal(workspaceModel.matchesInboxQuery(inquiry, query, true), false, `private search: ${query}`);
+  }
+  for (const query of ['', '  МАДИНА  ', 'командный']) {
+    assert.equal(workspaceModel.matchesInboxQuery(inquiry, query, true), true, `visible search: ${query}`);
+  }
+  assert.equal(workspaceModel.matchesInboxQuery({ ...inquiry, context: '+998 90 123 45 67 · Аренда' }, '+998 (90) 123-45-67', true), true);
+});
+
 test('team attention metrics open the matching work list', () => {
   assert.equal(typeof workspaceModel.teamMetricDestination, 'function');
   assert.equal(workspaceModel.teamMetricDestination('unassigned'), 'assign');

@@ -119,6 +119,17 @@ export function inboxItems(items: Item[]) {
   return items.filter(item => ['call', 'message', 'review', 'unassigned'].includes(item.kind));
 }
 
+export function matchesInboxQuery(item: Pick<Item, 'id' | 'context' | 'title' | 'source' | 'note'>, query: string, privateMode = false) {
+  const normalize = (text: string) => text.toLocaleLowerCase().normalize('NFKC').trim();
+  const fields = privateMode
+    ? [item.context.split(' · ')[0] || item.title, item.source]
+    : [item.id, item.context, item.source, item.note];
+  const text = normalize(fields.join(' '));
+  const needle = normalize(query);
+  const digits = needle.replace(/\D/g, '');
+  return !needle || text.includes(needle) || (/^[+\d\s()-]+$/.test(needle) && digits.length >= 3 && text.replace(/\D/g, '').includes(digits));
+}
+
 export function needsAssignee(item: Pick<Item, 'scope' | 'kind' | 'callId' | 'assignee'>) {
   return item.scope === 'team' && !item.assignee && (item.kind === 'unassigned' || Boolean(item.callId));
 }
