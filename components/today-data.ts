@@ -22,6 +22,7 @@ export type Item = {
   custom?: boolean;
   clientId?: string;
   assignee?: string;
+  receivedAt?: string;
   callId?: string;
   capture?: { need: string; price: string; currency: string; districts: string; channel: string; next: string; dueAt: string; note: string };
 };
