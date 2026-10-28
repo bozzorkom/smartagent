@@ -60,7 +60,7 @@ function projectCall(state: Workspace, call: CallRecord): Workspace {
     context: client?.name ?? (call.phone ? `Номер · •• ${call.phone.slice(-2)}` : 'Номер не определён'),
     source:'Демо-АТС', channel:'phone', time: new Intl.DateTimeFormat('ru-RU',{timeZone:'Asia/Tashkent',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(call.startedAt)),
     note:status, cta:'Открыть звонок', reason:'Доступно событие демонстрационной телефонии. Результат обработки ещё не отмечен.',
-    rank:call.status === 'missed' ? 1 : 2, due:Date.parse(call.startedAt), custom:true, clientId:call.clientId };
+    rank:call.status === 'missed' ? 1 : 2, due:Date.parse(call.startedAt), custom:true, clientId:call.clientId, assignee:call.assignee };
   const items = state.items.some(value => value.id === id) ? state.items.map(value => value.id === id ? item : value) : [...state.items,item];
   const resolved = state.resolved.filter(value => value !== id);
   if (!callNeedsAction(call)) resolved.push(id);
@@ -117,6 +117,10 @@ export function teamOverdueCount(items: Pick<Item, 'kind'>[], tasks: Pick<Task, 
 
 export function inboxItems(items: Item[]) {
   return items.filter(item => ['call', 'message', 'review', 'unassigned'].includes(item.kind));
+}
+
+export function needsAssignee(item: Pick<Item, 'scope' | 'kind' | 'callId' | 'assignee'>) {
+  return item.scope === 'team' && !item.assignee && (item.kind === 'unassigned' || Boolean(item.callId));
 }
 
 export type PrimaryAttention = { source: 'item'; value: Item } | { source: 'task'; value: Task } | null;
@@ -196,7 +200,7 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
     case 'callAssign': {
       const call=state.calls.find(value=>value.id===action.callId), assignee=action.assignee.trim();
       if (!call || call.scope!=='team' || call.contextAccess==='restricted' || call.businessVersion!==action.expectedVersion || !assignee || assignee===call.assignee) return state;
-      return {...state,calls:state.calls.map(value=>value.id===call.id?{...value,assignee,businessVersion:call.businessVersion+1}:value),history:[{id:`call-assign:${call.id}:${call.businessVersion}`,entityId:`call:${call.id}`,at:now,title:`Ответственный по звонку: ${assignee}`,clientId:call.clientId,scope:call.scope},...state.history]};
+      return {...state,calls:state.calls.map(value=>value.id===call.id?{...value,assignee,businessVersion:call.businessVersion+1}:value),items:state.items.map(item=>item.callId===call.id?{...item,assignee}:item),history:[{id:`call-assign:${call.id}:${call.businessVersion}`,entityId:`call:${call.id}`,at:now,title:`Ответственный по звонку: ${assignee}`,clientId:call.clientId,scope:call.scope},...state.history]};
     }
     case 'addClient': {
       const name = action.name.trim();

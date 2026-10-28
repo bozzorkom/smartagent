@@ -168,8 +168,12 @@ test('assigning a team call records responsibility without reassigning the clien
   const next=model.reduceWorkspace(state,{type:'callAssign',callId:'demo-pbx/e1',assignee:'Анна',expectedVersion:0},now);
   assert.ok(next?.calls?.length===1,'assignment must retain the call');
   assert.equal(next.calls[0].assignee,'Анна');
+  assert.equal(next.items[0].assignee,'Анна');
+  assert.deepEqual(next.resolved,state.resolved);
   assert.deepEqual(next.clients,state.clients);
   assert.equal(next.history[0].scope,'team');
+  const updated=model.reduceWorkspace(next,{type:'callEvent',event:{...event,scope:'team',sequence:2}},now);
+  assert.equal(updated.items[0].assignee,'Анна');
 });
 
 test('a corrected number invalidates its old identity until an explicit review',()=>{

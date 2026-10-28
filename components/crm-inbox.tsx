@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Search, PhoneMissed, MessageSquare, ChevronRight, X } from 'lucide-react';
 import { channelNames, type Item } from './today-data';
-import { inboxItems } from './today-state';
+import { inboxItems, needsAssignee } from './today-state';
 import './crm-inbox.css';
 
 type Filter = 'all' | 'reply' | 'missed' | 'unassigned';
@@ -14,14 +14,14 @@ export function CrmInbox({ items, initialFilter, incomplete, phoneConnected, res
   const [sort, setSort] = useState('priority');
   const [privateMode, setPrivateMode] = useState(false);
   const records = restricted ? [] : inboxItems(items);
-  const count = (kind: Filter) => records.filter(item => kind === 'all' || (kind === 'reply' ? item.kind === 'message' : kind === 'missed' ? item.kind === 'call' : item.kind === 'unassigned' && !item.assignee)).length;
+  const count = (kind: Filter) => records.filter(item => kind === 'all' || (kind === 'reply' ? item.kind === 'message' : kind === 'missed' ? item.kind === 'call' : needsAssignee(item))).length;
   const normalize = (text: string) => text.toLocaleLowerCase().normalize('NFKC').trim();
   const shown = records.filter(item => {
     const text = normalize([item.id, item.context, item.source, privateMode ? '' : item.note].join(' '));
     const needle = normalize(query);
     const digits = needle.replace(/\D/g, '');
     const search = !needle || text.includes(needle) || (/^[+\d\s()-]+$/.test(needle) && digits.length >= 3 && text.replace(/\D/g, '').includes(digits));
-    return search && (source === 'all' || (item.channel ?? 'manual') === source) && (filter === 'all' || (filter === 'reply' ? item.kind === 'message' : filter === 'missed' ? item.kind === 'call' : item.kind === 'unassigned' && !item.assignee));
+    return search && (source === 'all' || (item.channel ?? 'manual') === source) && (filter === 'all' || (filter === 'reply' ? item.kind === 'message' : filter === 'missed' ? item.kind === 'call' : needsAssignee(item)));
   }).sort((a, b) => sort === 'priority' ? a.rank - b.rank || a.id.localeCompare(b.id) : a.context.localeCompare(b.context, 'ru') || a.id.localeCompare(b.id));
   function reset() { setFilter('all'); setSource('all'); setQuery(''); }
   return <section className="crm-inbox">
@@ -36,7 +36,7 @@ export function CrmInbox({ items, initialFilter, incomplete, phoneConnected, res
       <label className="crm-private"><input type="checkbox" checked={privateMode} onChange={event => setPrivateMode(event.target.checked)}/>Скрыть содержимое сообщений</label>
       <div className="today-row"><h3>Обращения <span className="today-muted">{shown.length}</span></h3>{(query || filter !== 'all' || source !== 'all') && <button className="today-link" onClick={reset}>Сбросить</button>}</div>
       <p className="crm-caption">Важность — по правилам Today. Группировка диалогов и сортировка по времени появятся на следующем этапе.</p>
-      <ul className="crm-list">{shown.map(item => <li key={item.id}><button className="crm-record" onClick={() => onOpen(item)}><span className="crm-icon">{item.kind === 'call' ? <PhoneMissed size={20}/> : <MessageSquare size={20}/>}</span><span className="crm-body"><strong>{item.context.split(' · ')[0] || item.title}</strong><span className="crm-preview">{privateMode ? 'Содержимое скрыто настройками приватности' : item.note || item.title}</span><small>{item.channel ? channelNames[item.channel] : item.source || 'Источник не указан'} · {item.time}</small><span className="crm-status">{item.kind === 'unassigned' ? 'Без ответственного' : item.kind === 'review' ? 'Требует проверки' : item.kind === 'call' ? 'Требует обратного звонка' : item.kind === 'message' ? 'Требует ответа' : item.status || 'В работе'}{item.assignee ? ` · ${item.assignee}` : ''}</span></span><ChevronRight size={16}/></button></li>)}</ul>
+      <ul className="crm-list">{shown.map(item => <li key={item.id}><button className="crm-record" onClick={() => onOpen(item)}><span className="crm-icon">{item.kind === 'call' ? <PhoneMissed size={20}/> : <MessageSquare size={20}/>}</span><span className="crm-body"><strong>{item.context.split(' · ')[0] || item.title}</strong><span className="crm-preview">{privateMode ? 'Содержимое скрыто настройками приватности' : item.note || item.title}</span><small>{item.channel ? channelNames[item.channel] : item.source || 'Источник не указан'} · {item.time}</small><span className="crm-status">{item.kind === 'unassigned' ? 'Без ответственного' : item.kind === 'review' ? 'Требует проверки' : item.kind === 'call' ? 'Требует обратного звонка' : item.kind === 'message' ? 'Требует ответа' : item.status || 'В работе'}{item.callId && needsAssignee(item) ? ' · Без ответственного' : ''}{item.assignee ? ` · ${item.assignee}` : ''}</span></span><ChevronRight size={16}/></button></li>)}</ul>
       {!shown.length && <div className="crm-empty"><MessageSquare size={28}/><h3>{records.length ? 'Ничего не найдено' : 'Пока нет обращений'}</h3><p>Проверьте фильтры, подключите источник или добавьте обращение вручную.</p><button className="today-secondary" onClick={reset}>Сбросить фильтры</button></div>}
       <button className="today-primary" onClick={onAdd}>Добавить обращение</button><p className="crm-caption">Данные до перезагрузки. Реальные сообщения и звонки не отправляются.</p>
     </>}

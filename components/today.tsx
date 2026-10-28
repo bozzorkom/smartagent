@@ -14,7 +14,7 @@ import {
   byPriority, channelNames, clockNow, demoItems, demoTasks, employees, plural, problemStates, results, scenarios,
   type ChannelId, type ChannelStates, type Item, type Kind, type Scenario, type Task,
 } from './today-data';
-import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, taskSummaryCounts, teamOverdueCount, inboxItems, primaryAttention, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
+import { createWorkspace, reduceWorkspace, workspaceDate, localDateTime, validDueAt, taskDay, taskSummaryCounts, teamOverdueCount, inboxItems, needsAssignee, primaryAttention, clientHistory, teamMetricDestination, type Workspace, type WorkspaceAction } from './today-state';
 
 const kindIcons: Record<Kind, typeof Phone> = {
   overdue: Clock3, call: PhoneMissed, message: MessageSquare, promise: CalendarClock, review: CircleHelp,
@@ -150,7 +150,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const undatedTasks = todayTasks.filter(task => taskDay(task) === 'undated');
   const archivedTasks = todayTasks.filter(task => task.done && !doneTasks.includes(task));
   const pendingTasks = todayTasks.filter(task => !task.done);
-  const unassigned = team.filter(item => item.kind === 'unassigned' || (item.callId && !workspace.calls.find(call=>call.id===item.callId)?.assignee));
+  const unassigned = team.filter(needsAssignee);
 
   function matches(item: Item) {
     return filter === 'reply' ? item.kind === 'message' : filter === 'missed' ? item.kind === 'call' : true;

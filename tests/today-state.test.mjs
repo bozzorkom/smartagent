@@ -13,6 +13,21 @@ test('team attention metrics open the matching work list', () => {
   assert.equal(workspaceModel.teamMetricDestination('overdue'), 'plan');
 });
 
+test('unassigned queue includes team calls but never personal records or assigned inquiries', () => {
+  assert.equal(typeof workspaceModel.needsAssignee, 'function');
+  if (typeof workspaceModel.needsAssignee !== 'function') return;
+  const items = [
+    { ...item, id: 'lead', kind: 'unassigned', scope: 'team' },
+    { ...item, id: 'call', kind: 'call', scope: 'team', callId: 'c1' },
+    { ...item, id: 'review', kind: 'review', scope: 'team', callId: 'c2' },
+    { ...item, id: 'assigned-call', kind: 'call', scope: 'team', callId: 'c3', assignee: 'Анна' },
+    { ...item, id: 'assigned-lead', kind: 'unassigned', scope: 'team', assignee: 'Анна' },
+    { ...item, id: 'personal', kind: 'call', callId: 'c4' },
+    { ...item, id: 'task', kind: 'teamOverdue', scope: 'team' },
+  ];
+  assert.deepEqual(items.filter(workspaceModel.needsAssignee).map(value => value.id), ['lead', 'call', 'review']);
+});
+
 test('inbox keeps team inquiries after assignment and excludes follow-up reminders', () => {
   assert.equal(typeof workspaceModel.inboxItems, 'function');
   if (typeof workspaceModel.inboxItems !== 'function') return;
