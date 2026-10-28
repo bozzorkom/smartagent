@@ -3,6 +3,18 @@ import assert from 'node:assert/strict';
 import { createWorkspace, reduceWorkspace, taskDay, workspaceDate } from '../components/today-state.ts';
 import * as workspaceModel from '../components/today-state.ts';
 
+test('capture saves contact, structured request and task atomically and ignores retries', () => {
+ const value = {mode:'new',clientId:'',name:'Новый клиент',phone:'901234567',need:'Купить',price:'120000',currency:'USD',districts:'Чиланзар',channel:'manual',next:'Уточнить запрос',dueAt:'2026-11-01T10:00',note:'Тест',duplicateConfirmed:false};
+ const action = {type:'capture',id:'request-1',clientId:'new-client',value};
+ const before = createWorkspace();
+ const next = reduceWorkspace(before,action);
+ assert.equal(next.clients.length,1); assert.equal(next.items.length,1); assert.equal(next.tasks.length,1);
+ assert.equal(next.items[0].capture.currency,'USD'); assert.equal(next.tasks[0].clientId,'new-client');
+ assert.equal(reduceWorkspace(next,action),next);
+ assert.equal(reduceWorkspace(before,{...action,value:{...value,price:'-10'}}),before);
+ assert.equal(reduceWorkspace(next,{...action,id:'request-2',clientId:'other'}),next);
+});
+
 const now = '2026-10-26T19:30:00.000Z'; // 27 October, 00:30 in Tashkent.
 const item = { id: 'a1', kind: 'overdue', scope: 'mine', title: 'Позвонить', context: 'Клиент №128', source: 'Вручную', type: 'Контакт', time: 'Вчера', note: '', cta: 'Открыть', reason: '', due: 0, rank: 0, clientId: 'c1' };
 const seed = () => createWorkspace({ items: [item], clients: [{ id: 'c1', name: 'Азиз', request: 'Аренда', scope: 'mine' }] });

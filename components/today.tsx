@@ -6,6 +6,8 @@ import {
   UserPlus, UsersRound, WifiOff, X,
 } from 'lucide-react';
 import './today.css';
+import { QuickCapture } from './quick-capture';
+import { emptyCapture } from './quick-capture-model';
 import { CrmInbox, defaultInboxView, type InboxView } from './crm-inbox';
 import { ClientWorkspace, type ClientDraft } from './client-workspace';
 import { CallerWorkspace } from './caller-workspace';
@@ -73,7 +75,8 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const [saveFailed, setSaveFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [assignees, setAssignees] = useState<Record<string, string>>({});
-  const [addType, setAddType] = useState<AddType | null>(null);
+  const [capture, setCapture] = useState({...emptyCapture});
+ const [addType, setAddType] = useState<AddType | null>(null);
   const [form, setForm] = useState({ title: '', detail: '', time: '', date: '', clientId: '' });
   const addDrafts = useRef<Record<string, AddForm>>({});
   const addDraftKey = useRef<string | null>(null);
@@ -413,7 +416,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
 
   if (scenario === 'error') {
     return <section className="today" hidden={!active}><div className="today-scroll today-center">
-      <TriangleAlert size={32} /><h1 ref={heading} tabIndex={-1} className="today-h2">Не удалось загрузить рабочий день</h1>
+      <TriangleAlert size={32} /><h1 ref={heading} tabIndex={-1} className="today-h2">Не удалось ��агрузить рабочий день</h1>
       <p className="today-muted">Проверьте соединение и попробуйте снова.</p>
       <button className="today-primary" onClick={() => changeScenario('loading')}>Повторить</button>
     </div></section>;
@@ -620,12 +623,12 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
         </>}
 
         {sheet === 'add' && <>
-          <h2 id="today-sheet-title" className="today-h2">{addType ? { client: 'Новый клиент', lead: 'Рабочее обращение', task: 'Новая задача' }[addType] : 'Что добавить?'}</h2>
+          <h2 id="today-sheet-title" className="today-h2">{addType ? { client: 'Новый клиент', lead: 'Новая заявка', task: 'Новая задача' }[addType] : 'Что добавить?'}</h2>
           {!addType ? <div className="today-stack">
             {([['client', 'Нового клиента', UsersRound], ['lead', 'Рабочее обращение', Inbox], ['task', 'Задачу', CalendarClock]] as const).map(([id, label, Icon]) => <button key={id} className="today-option" onClick={() => openAdd(id)}><Icon size={19} />{label}<ChevronRight size={18} /></button>)}
             <p className="today-muted">Объекты и показы появятся здесь, когда модули будут подключены.</p>
-          </div> : <form className="today-form" onSubmit={e => { e.preventDefault(); addEntry(); }}>
-            <label htmlFor="add-title">{addType === 'client' ? 'Имя или метка клиента' : addType === 'lead' ? 'Кто обратился' : 'Что нужно сделать'}</label>
+          </div> : addType === 'lead' ? <QuickCapture value={capture} onChange={setCapture} clients={clients.filter(c => !c.archived && (c.scope === 'mine' || (isOwner && teamData && scope === 'team')))} onSave={() => { const saved = commit({type:'capture',id:crypto.randomUUID(),clientId:capture.mode === 'existing' ? capture.clientId : crypto.randomUUID(),value:capture}, 'Заявка создана.'); if (saved) setCapture({...emptyCapture}); return saved; }}/> : <form className="today-form" onSubmit={e => { e.preventDefault(); addEntry(); }}>
+            <label htmlFor="add-title">{addType === 'client' ? 'Имя или метка клиента' : 'Что нужно сделать'}</label>
             <input id="add-title" required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder={addType === 'task' ? 'Например, позвонить клиенту №12' : 'Например, Клиент №12'} />
             <label htmlFor="add-detail">{addType === 'task' ? 'Клиент или контекст' : 'Запрос'} · необязательно</label>
             <input id="add-detail" value={form.detail} onChange={e => setForm(f => ({ ...f, detail: e.target.value }))} placeholder="Аренда · Чиланзар" />

@@ -1,4 +1,5 @@
-import type { Item, Task } from './today-data';
+import type { Item, Task, ChannelId } from './today-data';
+import { captureError, type Capture } from './quick-capture-model.ts';
 import type { CallEvent, CallRecord, CallOutcome, CallStatus } from './caller-data';
 
 export const callLabels: Record<CallStatus, string> = {
@@ -11,6 +12,7 @@ export type Client = { id: string; name: string; request: string; scope: 'mine' 
 export type Activity = { id: string; entityId: string; at: string; title: string; outcome?: string; note?: string; clientId?: string; scope?: 'mine' | 'team' };
 export type Workspace = { items: Item[]; tasks: Task[]; clients: Client[]; history: Activity[]; resolved: string[]; drafts: Record<string, string>; calls: CallRecord[] };
 export type WorkspaceAction =
+  | { type: 'capture'; id: string; clientId: string; value: Capture }
   | { type: 'callEvent'; event: CallEvent }
   | { type: 'callResult'; callId: string; operationId: string; expectedVersion: number; outcome: CallOutcome; note: string; callbackAttempt?: boolean; followUp?: { id: string; dueAt: string; title?: string } }
   | { type: 'callLink'; callId: string; clientId: string; expectedVersion: number }
@@ -230,6 +232,16 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
       const client = state.clients.find(value => value.id === action.clientId), note = action.note.trim();
       if (!client || !note || note.length > 2000) return state;
       return { ...state, history: record(client.id, 'Заметка добавлена вами', { clientId: client.id, scope: client.scope, note }) };
+    }
+    case 'capture': {
+      const v = action.value;
+      if (state.items.some(i => i.id === action.id) || captureError(v,state.clients)) return state;
+      const client = v.mode === 'existing' ? state.clients.find(c => c.id === v.clientId && !c.archived) : {id:action.clientId,name:v.name.trim(),phone:normalizePhone(v.phone),request:v.need,scope:'mine' as const};
+      if (!client) return state;
+      const note = [v.need, v.price ? `${v.price} ${v.currency}` : 'Цена не указана', v.districts.trim(), v.note.trim()].filter(Boolean).join(' · ');
+      const item: Item = {capture:{need:v.need,price:v.price,currency:v.currency,districts:v.districts,channel:v.channel,next:v.next,dueAt:v.dueAt,note:v.note},id:action.id,clientId:client.id,scope:client.scope,kind:'review',type:'Новая заявка',title:'Обработать заявку',context:client.name,source:v.channel === 'manual' ? 'Добавлено вами' : v.channel,channel:v.channel === 'manual' ? undefined : v.channel as ChannelId,time:'Только что',note,cta:'Открыть заявку',reason:'Заявка создана вручную. Требуется проверка.',due:Date.parse(now),rank:2,custom:true};
+      const task: Task = {id:`${action.id}:next`,clientId:client.id,scope:client.scope,title:v.next.trim(),dueAt:v.dueAt,time:v.dueAt.slice(11),context:client.name,state:'Запланировано',done:false,custom:true};
+      return {...state,clients:v.mode === 'new' ? [...state.clients,client] : state.clients,items:[...state.items,item],tasks:v.next.trim() ? [...state.tasks,task] : state.tasks,history:record(item.id,'Создана заявка',{clientId:client.id,scope:client.scope,note})};
     }
     case 'receive':
       if (state.items.some(value => value.id === action.item.id)) return state;

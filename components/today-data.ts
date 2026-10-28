@@ -23,6 +23,7 @@ export type Item = {
   clientId?: string;
   assignee?: string;
   callId?: string;
+  capture?: { need: string; price: string; currency: string; districts: string; channel: string; next: string; dueAt: string; note: string };
 };
 
 export type Task = { id: string; time: string; title: string; context: string; state: string; done: boolean; custom?: boolean; dueAt?: string; clientId?: string; completedAt?: string; scope?: 'mine' | 'team'; callId?: string };
