@@ -249,7 +249,7 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
     case 'assign': {
       const changed = state.items.filter(item => item.scope === 'team' && item.kind === 'unassigned' && action.assignments[item.id]?.trim());
       if (!changed.length) return state;
-      return { ...state, items: state.items.map(item => changed.includes(item) ? { ...item, kind: 'review', type: 'Назначено сотруднику', assignee: action.assignments[item.id], cta: 'Открыть обращение', note: `Ответственный: ${action.assignments[item.id]}`, reason: `Обращение назначено сотруднику ${action.assignments[item.id]}. Проверьте результат обработки.` } : item),
+      return { ...state, items: state.items.map(item => changed.includes(item) ? { ...item, kind: 'review', type: 'Назначено сотруднику', assignee: action.assignments[item.id], cta: 'Открыть обращение', reason: `Обращение назначено сотруднику ${action.assignments[item.id]}. Проверьте результат обработки.` } : item),
         history: [...changed.map((item, i) => ({ id: `${now}-assign-${state.history.length + i}`, entityId: item.id, at: now, scope: 'team' as const, title: `Назначен сотрудник: ${action.assignments[item.id]}` })), ...state.history] };
     }
     case 'toggleTask': {

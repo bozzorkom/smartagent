@@ -167,10 +167,13 @@ test('invalid and past reschedules leave the original action open', () => {
 });
 
 test('assignment changes ownership without deleting the team inquiry', () => {
-  const state = createWorkspace({ items: [{ ...item, kind: 'unassigned', scope: 'team' }] });
+  const state = createWorkspace({ items: [{ ...item, kind: 'unassigned', scope: 'team', note: 'Нужна аренда на год, связаться после 18:00.' }] });
   const assigned = reduceWorkspace(state, { type: 'assign', assignments: { a1: 'Анна' } }, now);
   assert.equal(assigned.items[0].assignee, 'Анна');
   assert.equal(assigned.items[0].kind, 'review');
+  assert.equal(assigned.items[0].note, 'Нужна аренда на год, связаться после 18:00.');
+  assert.equal(assigned.items[0].context, 'Клиент №128');
+  assert.equal(assigned.items[0].clientId, 'c1');
   assert.equal(assigned.resolved.includes('a1'), false);
   assert.equal(assigned.history[0].entityId, 'a1');
 });
