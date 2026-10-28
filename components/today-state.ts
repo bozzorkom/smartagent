@@ -28,6 +28,9 @@ export type WorkspaceAction =
   | { type: 'outcome'; itemId: string; outcome: string; note: string; followUp?: { id: string; dueAt: string } }
   | { type: 'reschedule'; itemId: string; taskId: string; dueAt: string }
   | { type: 'dismiss'; itemId: string }
+  | { type: 'shieldResolve'; itemIds: string[]; outcome: string; note: string }
+  | { type: 'shieldNeedsReply'; itemId: string }
+  | { type: 'shieldHandoff'; itemIds: string[]; assignee: string }
   | { type: 'assign'; assignments: Record<string, string> }
   | { type: 'toggleTask'; taskId: string }
   | { type: 'rescheduleTask'; taskId: string; dueAt: string }
@@ -266,8 +269,26 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
       return { ...state, resolved: [...state.resolved, item.id], tasks: [...state.tasks, task],
         history: record(item.id, 'Срок перенесён', { clientId: item.clientId, note: action.dueAt.replace('T', ', ') }) };
     }
+    case 'shieldResolve': {
+  const ids = [...new Set(action.itemIds)].filter(id => state.items.some(value => value.id === id && !value.callId) && !state.resolved.includes(id));
+  if (!ids.length || ids.length !== new Set(action.itemIds).size || !action.outcome.trim()) return state;
+  const first = state.items.find(value => value.id === ids[0])!;
+  return { ...state, resolved: [...state.resolved, ...ids],
+    history: record(first.id, ids.length > 1 ? `Результат отмечен по ${ids.length} событиям` : 'Результат отмечен вами', { clientId: first.clientId, outcome: action.outcome, note: action.note.trim() || 'Результат указал пользователь' }) };
+  }
+    case 'shieldNeedsReply':
+  if (!open || item.kind !== 'review' || item.callId) return state;
+  return { ...state, items: state.items.map(value => value.id === item.id ? { ...value, kind: 'message', type: 'Требует ответа', title: 'Ответить клиенту', cta: 'Ответить', status: 'Ответ нужен · отмечено вручную', reason: 'Вы отметили, что по обращению нужен ответ. Отправка ответа пока не зафиксирована.' } : value),
+    history: record(item.id, 'Отмечено: ответ нужен', { clientId: item.clientId }) };
+    case 'shieldHandoff': {
+  const ids = [...new Set(action.itemIds)];
+  const targets = state.items.filter(value => ids.includes(value.id) && value.scope === 'team' && !value.callId && !state.resolved.includes(value.id));
+  if (!action.assignee.trim() || targets.length !== ids.length || targets.every(value => value.assignee === action.assignee)) return state;
+  return { ...state, items: state.items.map(value => targets.includes(value) ? { ...value, assignee: action.assignee } : value),
+    history: record(targets[0].id, `Передано сотруднику: ${action.assignee}`, { clientId: targets[0].clientId, scope: 'team' }) };
+  }
     case 'dismiss':
-      if (!open) return state;
+  if (!open) return state;
       return { ...state, resolved: [...state.resolved, item.id], history: record(item.id, 'Отмечено вами как неактуальное', { clientId: item.clientId }) };
     case 'assign': {
       const changed = state.items.filter(item => item.scope === 'team' && item.kind === 'unassigned' && action.assignments[item.id]?.trim());
