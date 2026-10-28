@@ -28,6 +28,7 @@ type Undo = { message: string; restore: () => void } | null;
 type AddType = 'client' | 'lead' | 'task';
 type AddForm = { title: string; detail: string; time: string; date: string; clientId: string };
 type ClientOrigin = { id: string; scroll: number; focus: string | null };
+type InboxOrigin = { scope: 'mine' | 'team'; itemId: string; scroll: number };
 
 export function Today({ channels, role, active, onChannels }: { channels: ChannelStates; role: string; active: boolean; onChannels: () => void }) {
   const [clock, setClock] = useState({ greeting: '', day: '', time: '' });
@@ -79,6 +80,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   const [toast, setToast] = useState<{ text: string; undo?: Undo } | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const dialogOpener = useRef<HTMLElement | null>(null);
+  const inboxReturn = useRef<InboxOrigin | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const queueRef = useRef<HTMLElement>(null);
   const failNextSave = useRef(false);
@@ -108,8 +110,8 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     }
   if(sheet==='caller'&&dialog.current)dialog.current.scrollTop=0;
   }, [sheet, active, addType, callerId]);
-  useEffect(() => { if (!active) setSheet(null); }, [active]);
-  useEffect(() => { setScope('mine'); }, [role]);
+  useEffect(() => { if (!active) { setSheet(null); inboxReturn.current = null; } }, [active]);
+  useEffect(() => { setScope('mine'); inboxReturn.current = null; }, [role]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
 
   const connected = channelIds.filter(id => channels[id] === 'connected');
@@ -180,7 +182,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     if (callerDraft.dirty) {callerExitAction.current=action;setCallerExit(true);} else action();
   }
   function openCaller(id = callerId) {if(saveLock.current)return;setCallerId(id);setCallerExit(false);setFormError('');setSheet('caller');}
-  function leaveCaller() {setCallerExit(false);if(clientReturn.current)return returnToClient();setSheet(null);setFilter(null);setFormError('');}
+  function leaveCaller() {setCallerExit(false);if(clientReturn.current)return returnToClient();if(inboxReturn.current)return returnToInbox();setSheet(null);setFilter(null);setFormError('');}
   function callerClient(id: string) {
     if (saveLock.current || !selectedCall || selectedCall.contextAccess!=='ready' || accessLost || (selectedCall.scope==='team'&&!isOwner)) return;
     callerReturn.current.push({id:callerId,scroll:dialog.current?.scrollTop??0,origin:clientReturn.current});
@@ -223,7 +225,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     if (access.offline) { setFormError('Нет сети. Изменение не сохранено; черновик остаётся в этом сеансе.'); notify('Нет сети: действие не сохранено.'); return false; }
     const before = model.current, next = reduceWorkspace(before, action);
     if (before === next) { setFormError('Изменение не сохранено. Проверьте данные и актуальность действия.'); return false; }
-    replace(next); if (close) { if (clientReturn.current) returnToClient(true); else { setSheet(null); setFilter(null); } } setFormError('');
+    replace(next); if (close) { if (clientReturn.current) returnToClient(true); else if (inboxReturn.current) returnToInbox(true); else { setSheet(null); setFilter(null); } } setFormError('');
     notify(`${message} · в демо-сеансе`, { message, restore: () => {
       if (accessRef.current.lost || accessRef.current.offline || (targetScope === 'team' && !accessRef.current.owner)) return notify('Отмена недоступна: проверьте доступ и соединение.');
       if (model.current !== next) return notify('После этого изменения есть новые данные. Отмена недоступна.');
@@ -232,6 +234,22 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     return true;
   }
   const clientReturn = useRef<ClientOrigin | null>(null);
+  function openInboxItem(item: Item) {
+    inboxReturn.current = { scope, itemId: item.id, scroll: dialog.current?.scrollTop ?? 0 };
+    openItem(item);
+  }
+  function returnToInbox(afterSave = false) {
+    const target = inboxReturn.current;
+    if (!target || (saveLock.current && !afterSave)) return;
+    inboxReturn.current = null;
+    setScope(target.scope); setSheet('inbox'); setFormError('');
+    requestAnimationFrame(() => {
+      if (!dialog.current) return;
+      const origin = dialog.current.querySelector<HTMLElement>(`[data-inbox-item="${CSS.escape(target.itemId)}"]`);
+      (origin ?? dialog.current.querySelector<HTMLElement>('#today-sheet-title'))?.focus({ preventScroll: true });
+      dialog.current.scrollTop = target.scroll;
+    });
+  }
   function leaveClient(action: () => void) {
     clientReturn.current = { id: clientId, scroll: dialog.current?.scrollTop ?? 0, focus: document.activeElement?.getAttribute('data-client-focus') ?? null };
     action();
@@ -257,6 +275,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
       const target=callerReturn.current.pop()!;clientReturn.current=target.origin;setCallerId(target.id);setSheet('caller');setFormError('');
       requestAnimationFrame(()=>{if(dialog.current)dialog.current.scrollTop=target.scroll;});return;
     }
+    if (inboxReturn.current) return returnToInbox();
     setSheet(null);setFilter(null);setFormError('');
   }
   function openClient(item?: Item) {
@@ -348,7 +367,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     }
     if (addType === 'lead') saved = commit({ type: 'addLead', item: { id, kind: 'review', scope: clients.find(value => value.id === form.clientId)?.scope ?? 'mine', type: 'Добавлено вручную', title: 'Обработать обращение', context: form.title.trim(), source: 'Добавлено вами', time: `Сегодня, ${clock.time}`, note: form.detail.trim() || 'Следующий шаг не указан.', cta: 'Открыть обращение', reason: 'Вы добавили обращение вручную. Результат обработки пока не отмечен.', due: Date.now(), rank: 2, custom: true, clientId: form.clientId || undefined } }, 'Обращение добавлено');
     if (addType === 'client') {
-      saved = commit({ type: 'addClient', id, name: form.title, request: form.detail, itemId: current?.id }, 'Клиент добавлен');
+      saved = commit({ type: 'addClient', id, name: form.title, request: form.detail, itemId: current?.id }, 'Клиент добавлен', false);
       if (saved) { setClientId(id); setCurrent(null); setSheet('client'); }
     }
     if (!saved) return;
@@ -517,8 +536,9 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
         <span className="today-grabber" aria-hidden="true" />
         {clientReturn.current && sheet !== 'client' && <button className="today-link" disabled={saving} onClick={() => sheet==='caller'?closeSheet():returnToClient()}>Назад к клиенту</button>}
         {callerReturn.current.length>0 && sheet==='client' && !clientReturn.current && <button className="today-link" onClick={closeSheet}>Назад к звонку</button>}
+        {inboxReturn.current && !clientReturn.current && !callerReturn.current.length && sheet !== 'inbox' && <button className="today-link" disabled={saving} onClick={closeSheet}>Назад к списку</button>}
         <button className="today-close" aria-label="Закрыть" disabled={saving} onClick={closeSheet}><X size={20} /></button>
-        {sheet==='caller'&&<CallerWorkspace workspace={workspace} callId={callerId} draft={callerDraft} onDraftChange={updateCallerDraft} onExample={callerExample} onSelect={id=>openCaller(id)} onAction={callerAction} onOpenClient={callerClient} onChannels={()=>requestCallerExit(()=>{setSheet(null);onChannels();})} onInbox={()=>requestCallerExit(()=>{clientReturn.current=null;callerReturn.current=[];setFilter(null);setSheet('inbox');})} offline={offline} accessLost={accessLost} isOwner={isOwner} onRestoreNetwork={()=>changeScenario('normal')} exitRequested={callerExit} onStay={()=>setCallerExit(false)} onLeave={()=>{setCallerExit(false);callerExitAction.current();}} onBusy={busy=>{saveLock.current=busy;setSaving(busy);}}/>}
+        {sheet==='caller'&&<CallerWorkspace workspace={workspace} callId={callerId} draft={callerDraft} onDraftChange={updateCallerDraft} onExample={callerExample} onSelect={id=>openCaller(id)} onAction={callerAction} onOpenClient={callerClient} onChannels={()=>requestCallerExit(()=>{inboxReturn.current=null;setSheet(null);onChannels();})} onInbox={()=>requestCallerExit(()=>{clientReturn.current=null;callerReturn.current=[];if(inboxReturn.current)returnToInbox();else{setFilter(null);setSheet('inbox');}})} offline={offline} accessLost={accessLost} isOwner={isOwner} onRestoreNetwork={()=>changeScenario('normal')} exitRequested={callerExit} onStay={()=>setCallerExit(false)} onLeave={()=>{setCallerExit(false);callerExitAction.current();}} onBusy={busy=>{saveLock.current=busy;setSaving(busy);}}/>}
         {(sheet === 'profile' || sheet === 'more') && <>
           <h2 id="today-sheet-title" className="today-h2">{sheet === 'profile' ? 'Ваше пространство' : 'Ещё'}</h2>
           <p className="today-muted">{context}. Роль: {role === 'owner' ? 'руководитель' : role === 'agent' ? 'сотрудник' : 'самостоятельная работа'}. Выбор роли не создаёт агентство и не предоставляет доступ к чужим данным.</p>
@@ -527,7 +547,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <button className="today-option" onClick={()=>{clientReturn.current=null;callerReturn.current=[];openCaller();}}><Phone size={18}/>Звонки и Caller ID<ChevronRight size={18}/></button>
           <p className="today-note">Объекты, показы, сделки и расширенные настройки появятся отдельными экранами на следующих этапах.</p>
         </>}
-        {sheet === 'inbox' && <CrmInbox items={list} view={inboxViews[scope]} onViewChange={updateInboxView} incomplete={incomplete} phoneConnected={phoneData} restricted={accessLost} team={scope === 'team' && isOwner} onOpen={openItem} onChannels={() => { closeSheet(); onChannels(); }} onAdd={() => openAdd('lead')}/>}
+        {sheet === 'inbox' && <CrmInbox items={list} view={inboxViews[scope]} onViewChange={updateInboxView} incomplete={incomplete} phoneConnected={phoneData} restricted={accessLost} team={scope === 'team' && isOwner} onOpen={openInboxItem} onChannels={() => { closeSheet(); onChannels(); }} onAdd={() => openAdd('lead')}/>}
         {sheet === 'plan' && <><h2 id="today-sheet-title" className="today-h2">Весь план · {planCount}</h2><p className="today-muted">{scope === 'team' ? `Просроченные сигналы: ${planItems.length} · Датированные задачи: ${todayTasks.length}.` : `Невыполненные: ${pendingTasks.length} · Завершённые: ${todayTasks.length - pendingTasks.length}. Счётчик на главной показывает только задачи, срок которых ещё наступит сегодня.`}</p>{scope === 'team' && <section><h3 className="today-label">Просроченные действия · {planItems.length}</h3>{planItems.length ? <div className="today-list">{planItems.map(item => <ActionCard key={item.id} item={item} onOpen={() => openItem(item)} onMenu={() => openItem(item)}/>)}</div> : <p className="today-muted">Нет действий в этой группе.</p>}</section>}{[['Просрочено', overdueTasks], ['Сегодня', openTasks], ['Позже', futureTasks], ['Без срока', undatedTasks], ['Выполнено сегодня', doneTasks], ['Выполнено ранее', archivedTasks]].map(([label, group]) => <section key={label as string}><h3 className="today-label">{label as string} · {(group as Task[]).length}</h3>{(group as Task[]).length ? <DatedTasks tasks={group as Task[]} onToggle={toggleTask} onOpen={openTask}/> : <p className="today-muted">Нет задач в этой группе.</p>}</section>)}</>}
         {sheet === 'clients' && (accessLost ? <><h2 id="today-sheet-title">Доступ ограничен</h2><p className="today-muted">Список клиентов скрыт до восстановления демо-доступа.</p></> : <><h2 id="today-sheet-title" className="today-h2">Клиенты в этом сеансе</h2><p className="today-muted">Быстрый список Today · данные до перезагрузки.</p>{clients.filter(client => !client.archived && (client.scope === 'mine' || (isOwner && teamData && scope === 'team'))).map(client => <button className="today-option" key={client.id} onClick={() => { setClientId(client.id); setCurrent(null); setSheet('client'); }}><span><strong>{client.name}</strong><small>{client.request || 'Запрос не указан'}</small></span><ChevronRight size={18}/></button>)}<button className="today-secondary" onClick={() => openAdd('client')}>Добавить клиента</button></>)}
         {sheet === 'client' && (client && clientDraft ? <ClientWorkspace key={client.id} client={client} draft={clientDraft} onDraftChange={updateClientDraft} items={items.filter(item => item.clientId === client.id)} tasks={tasks.filter(task => task.clientId === client.id)} history={clientHistory(workspace, client.id)} restricted={accessLost || (client.scope === 'team' && !isOwner)} onEdit={(name, request) => commit({ type: 'editClient', clientId: client.id, name, request }, 'Данные клиента обновлены.', false)} onNote={note => commit({ type: 'clientNote', clientId: client.id, note }, 'Заметка добавлена.', false)} onOpenItem={item => leaveClient(() => openItem(item))} onWrite={item => leaveClient(() => openItem(item, 'reply'))} onOpenTask={task => leaveClient(() => openTask(task))} onTask={() => leaveClient(() => openAdd('task', { clientId: client.id }))}/> : <><h2 id="today-sheet-title">Клиент ещё не связан</h2><p className="today-muted">Проверьте данные перед созданием клиента.</p><button className="today-primary" onClick={() => openAdd('client', { item: current ?? undefined })}>Создать клиента из обращения</button></>)}
