@@ -27,7 +27,7 @@ export type Item = {
   capture?: { need: string; price: string; currency: string; districts: string; channel: string; next: string; dueAt: string; note: string };
 };
 
-export type Task = { reminderMinutes?: number | null; assignee?: string; followUpKind?: 'action' | 'promise' | 'waiting'; id: string; time: string; title: string; context: string; state: string; done: boolean; custom?: boolean; dueAt?: string; clientId?: string; completedAt?: string; scope?: 'mine' | 'team'; callId?: string };
+export type Task = { propertyListingId?: string; reminderMinutes?: number | null; assignee?: string; followUpKind?: 'action' | 'promise' | 'waiting'; id: string; time: string; title: string; context: string; state: string; done: boolean; custom?: boolean; dueAt?: string; clientId?: string; completedAt?: string; scope?: 'mine' | 'team'; callId?: string };
 
 export const channelNames: Record<ChannelId, string> = {
   phone: 'Телефония',
@@ -104,7 +104,7 @@ export const demoItems: Item[] = [
 export const demoTasks: Task[] = [
   { id: 't19', time: '09:00', title: 'Позвонить по заявке', context: 'Клиент №19 · Аренда', state: 'Выполнено вами', done: true },
   { id: 't42', time: '11:30', title: 'Отправить подборку', context: 'Клиент №42 · Двухкомнатная квартира', state: 'Запланировано', done: false },
-  { id: 't57', time: '15:00', title: 'Подтвердить показ', context: 'Юнусабад · Клиент №57', state: 'Обычная задача', done: false },
+  { id: 't57', time: '15:00', title: 'Подтвердить показ', context: 'Юнусабад · Клиент №57', state: 'Обычная з��дача', done: false },
   { id: 't21', time: '17:30', title: 'Связаться с собственником', context: 'Уточнить актуальность предложения №21', state: 'Запланировано', done: false },
 ];
 

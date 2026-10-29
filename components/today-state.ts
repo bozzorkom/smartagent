@@ -2,6 +2,7 @@ import type { Item, Task, ChannelId } from './today-data';
 import { employees } from './today-data.ts';
 import { captureError, type Capture } from './quick-capture-model.ts';
 import type { CallEvent, CallRecord, CallOutcome, CallStatus } from './caller-data';
+import { createPropertyState, applyPropertyCommand, requestTargets, type PropertyState, type PropertyCommand, type PropertyAccess } from './property-model.ts';
 
 export const callLabels: Record<CallStatus, string> = {
   incoming:'Входящий рабочий звонок', connecting:'Соединяем…', active:'Разговор идёт', ended:'Звонок завершён',
@@ -9,10 +10,11 @@ export const callLabels: Record<CallStatus, string> = {
   canceled:'Звонящий завершил вызов', failed:'Не удалось установить соединение', unknown:'Результат звонка неизвестен',
 };
 
-export type Client = { id: string; name: string; request: string; scope: 'mine' | 'team'; phone?: string; archived?: boolean };
+export type Client = { id: string; name: string; request: string; primaryRequestId?: string; scope: 'mine' | 'team'; phone?: string; archived?: boolean };
 export type Activity = { id: string; entityId: string; at: string; title: string; outcome?: string; note?: string; clientId?: string; scope?: 'mine' | 'team' };
-export type Workspace = { items: Item[]; tasks: Task[]; clients: Client[]; history: Activity[]; resolved: string[]; drafts: Record<string, string>; calls: CallRecord[] };
+export type Workspace = { items: Item[]; tasks: Task[]; clients: Client[]; history: Activity[]; resolved: string[]; drafts: Record<string, string>; calls: CallRecord[]; propertyHub: PropertyState };
 export type WorkspaceAction =
+  | { type: 'property'; command: PropertyCommand; access: PropertyAccess }
   | { type: 'capture'; id: string; clientId: string; value: Capture }
   | { type: 'callEvent'; event: CallEvent }
   | { type: 'callResult'; callId: string; operationId: string; expectedVersion: number; outcome: CallOutcome; note: string; callbackAttempt?: boolean; followUp?: { id: string; dueAt: string; title?: string } }
@@ -41,7 +43,7 @@ export type WorkspaceAction =
   | { type: 'draft'; itemId: string; value: string };
 
 export function createWorkspace(seed: Partial<Pick<Workspace, 'items' | 'tasks' | 'clients'>> = {}): Workspace {
-  return { items: seed.items ?? [], tasks: seed.tasks ?? [], clients: seed.clients ?? [], history: [], resolved: [], drafts: {}, calls: [] };
+  return { items: seed.items ?? [], tasks: seed.tasks ?? [], clients: seed.clients ?? [], history: [], resolved: [], drafts: {}, calls: [], propertyHub: createPropertyState() };
 }
 
 export function normalizePhone(value?: string) {
@@ -170,6 +172,21 @@ export function teamMetricDestination(metric: 'unassigned' | 'overdue'): 'assign
   return metric === 'unassigned' ? 'assign' : 'plan';
 }
 
+export function applyPropertyWorkspace(state: Workspace, command: PropertyCommand, access: PropertyAccess, now = new Date().toISOString()): { workspace: Workspace; error: string } {
+  if (state.propertyHub.operations.includes(command.operationId)) return {workspace:state,error:''};
+  if (command.type === 'task' && (!validDueAt(command.dueAt) || command.dueAt <= localDateTime(now) || state.tasks.some(task => task.id === command.taskId) || !['Вы', ...employees].includes(command.assignee))) return { workspace: state, error: 'Укажите будущий срок, допустимого ответственного и новую задачу.' };
+  const result = applyPropertyCommand(state.propertyHub, command, access, requestTargets(state.clients.filter(client=>client.scope==='mine'||access.role==='owner'), state.items), now);
+  if (result.error || result.state === state.propertyHub) return { workspace: state, error: result.error };
+  const listing = 'id' in command ? result.state.listings.find(value => value.id === command.id) : undefined;
+  const task: Task | undefined = command.type === 'task' && listing ? {id:command.taskId,propertyListingId:listing.id,title:command.title.trim(),dueAt:command.dueAt,time:command.dueAt.slice(11),assignee:command.assignee,scope:listing.scope,context:`Объект №${listing.id}`,state:'Проверить сведения объекта',done:false,custom:true} : undefined;
+  const events = result.state.history.filter(entry => !state.propertyHub.history.some(old => old.id === entry.id));
+  const activities: Activity[] = events.flatMap(event => {
+    const clientIds = [...new Set([...state.propertyHub.links,...result.state.links].filter(link=>link.listingId===event.listingId).map(link=>link.clientId))];
+    return (clientIds.length ? clientIds : [undefined]).map(clientId=>({id:`property:${event.id}:${clientId ?? 'workspace'}`,entityId:task?.id ?? `property:${event.listingId}`,at:event.at,title:event.title,note:event.detail,scope:event.scope,clientId}));
+  });
+  return {workspace:{...state,propertyHub:result.state,tasks:task?[...state.tasks,task]:state.tasks,history:[...activities,...state.history]},error:''};
+}
+
 export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now = new Date().toISOString()): Workspace {
   const record = (entityId: string, title: string, detail: Partial<Activity> = {}) =>
     [{ id: `${now}-${state.history.length}`, entityId, at: now, title, scope: state.items.find(item => item.id === entityId)?.scope ?? state.tasks.find(task => task.id === entityId)?.scope ?? 'mine', ...detail }, ...state.history];
@@ -177,6 +194,7 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
   const open = item && !state.resolved.includes(item.id);
 
   switch (action.type) {
+    case 'property': return applyPropertyWorkspace(state, action.command, action.access, now).workspace;
     case 'callEvent': {
       const event = action.event;
       if (!event.provider.trim() || !event.externalId.trim() || !Object.keys(callLabels).includes(event.status) || !Number.isInteger(event.sequence) || event.sequence < 1 || !Number.isFinite(Date.parse(event.startedAt)) || !Number.isFinite(Date.parse(event.receivedAt))) return state;
@@ -250,7 +268,7 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
     case 'capture': {
       const v = action.value;
       if (state.items.some(i => i.id === action.id) || captureError(v,state.clients)) return state;
-      const client = v.mode === 'existing' ? state.clients.find(c => c.id === v.clientId && !c.archived) : {id:action.clientId,name:v.name.trim(),phone:normalizePhone(v.phone),request:v.need,scope:'mine' as const};
+      const client = v.mode === 'existing' ? state.clients.find(c => c.id === v.clientId && !c.archived) : {id:action.clientId,name:v.name.trim(),phone:normalizePhone(v.phone),request:v.need,primaryRequestId:action.id,scope:'mine' as const};
       if (!client) return state;
       const note = [v.need, v.price ? `${v.price} ${v.currency}` : 'Цена не указана', v.districts.trim(), v.note.trim()].filter(Boolean).join(' · ');
       const item: Item = {receivedAt:now,capture:{need:v.need,price:v.price,currency:v.currency,districts:v.districts,channel:v.channel,next:v.next,dueAt:v.dueAt,note:v.note},id:action.id,clientId:client.id,scope:client.scope,kind:'review',type:'Новая заявка',title:'Обработать заявку',context:client.name,source:v.channel === 'manual' ? 'Добавлено вами' : v.channel,channel:v.channel === 'manual' ? undefined : v.channel as ChannelId,time:'Только что',note,cta:'Открыть заявку',reason:'Заявка создана вручную. Требуется проверка.',due:Date.parse(now),rank:2,custom:true};
