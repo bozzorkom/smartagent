@@ -423,7 +423,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
 
   const status = problems.length
     ? { title: `${problems.length} ${plural(problems.length, 'канал требует', 'канала требуют', 'каналов требуют')} внимания`, caption: problems.map(id => channelNames[id]).join(', ') + ' · данные могут быть неполными', cta: 'Проверить', warn: true }
-    : delayed ? { title: 'Обновление Telegram задерживается', caption: 'Некоторые новые сообщения могут появиться позже.', cta: 'Проверить', warn: true }
+    : delayed ? { title: 'Обновление Telegram задерживается', caption: 'Некоторые новые сообщения могут поя��иться позже.', cta: 'Проверить', warn: true }
     : connected.length ? { title: 'Демо-каналы ��астроены', caption: 'Подключения имитируются. Реальные звонки и сообщения не поступают.', cta: '', warn: false }
     : channels.phone === 'manual' ? { title: 'Ручной учёт обращений', caption: 'Автоматические источники пока не подключены.', cta: 'Подключить', warn: false }
     : { title: 'Подключите рабочие каналы', caption: 'Звонки и сообщения из подключённых источников смогут появляться здесь.', cta: 'Настроить', warn: false };
@@ -534,7 +534,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
         {accessLost && <p role="status">Доступ отозван. Действия заблокированы, черновики сохранены в памяти сеанса.</p>}
         <button className="today-secondary" onClick={() => receiveDemoEvent()}>Новое событие по клиенту</button>
         <button className="today-secondary" onClick={() => receiveDemoEvent(true)}>Повторная доставка события</button>
-        <p>Данные живут в памяти текущего входа. Перезагрузка или выход к телефону очищает сеанс. Пример добавляется явно и сохраняет ваши записи. События каналов видны только после настройки соответствующего демо-канала на этапе №04.</p>
+        <p>Данные живут в памяти текущего входа. Перезагрузка или выход к телефону очищает сеанс. Пример добавляется явно и сохраняет ваши записи. События каналов видны только после настройки соответствующего демо-канала на ��тапе №04.</p>
       </details>
     </div>
 
@@ -566,7 +566,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <button className="today-option" onClick={()=>{clientReturn.current=null;callerReturn.current=[];openCaller();}}><Phone size={18}/>Звонки и Caller ID<ChevronRight size={18}/></button>
           <p className="today-note">Объекты, показы, сделки и расширенные настройки появятся отдельными экранами на следующих этапах.</p>
         </>}
-        {sheet === 'tasks' && <TaskWorkspace tasks={todayTasks} now={new Date().toISOString()} view={taskViews[scope]} onViewChange={view=>setTaskViews(previous=>({...previous,[scope]:view}))} restricted={accessLost || (scope==='team'&&!isOwner)} team={scope==='team'} onOpen={task=>leaveTasks(()=>openTask(task),task.id)} onAdd={()=>leaveTasks(()=>openAdd('task'))}/>}
+        {sheet === 'tasks' && <TaskWorkspace onKind={(task,kind)=>commit({type:'setTaskKind',taskId:task.id,kind},'Тип следующего шага сохранён',false)} tasks={todayTasks} now={new Date().toISOString()} view={taskViews[scope]} onViewChange={view=>setTaskViews(previous=>({...previous,[scope]:view}))} restricted={accessLost || (scope==='team'&&!isOwner)} team={scope==='team'} onOpen={task=>leaveTasks(()=>openTask(task),task.id)} onAdd={()=>leaveTasks(()=>openAdd('task'))}/>}
         {sheet === 'shield' && <LeadShield items={list} tasks={todayTasks} view={shieldView} onViewChange={change => setShieldView(previous => ({...previous,...change}))} team={scope === 'team' && isOwner} canHandoff={isOwner} restricted={accessLost} incomplete={incomplete} connectedCount={connected.length} phoneConnected={phoneData} handlers={{
           onOpen:(item, destination) => leaveShield(() => { openItem(item); if (!item.callId) setSheet(destination); }),
           onClient:item => leaveShield(() => openClient(item)),
@@ -623,13 +623,13 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <textarea id="today-draft" value={draft} onChange={e => { setDraft(e.target.value); replace(reduceWorkspace(model.current, { type: 'draft', itemId: current.id, value: e.target.value })); }} rows={5} />
           <p className="today-muted">Черновик остаётся при закрытии панели. Отправка и переход к личному диалогу в демо не подключены.</p>
           <button className="today-primary" disabled={!draft.trim()} onClick={copyDraft}>Скопировать текст</button>
-          {!resolved.includes(current.id) ? <button className="today-secondary" onClick={() => setSheet('result')}>Указать результат вручную</button> : <p className="today-note">Предыдущее обращение уже обработано. Подготовка или копирование нового текста не изменяет его результат и не подтверждает отправку.</p>}
+          {!resolved.includes(current.id) ? <button className="today-secondary" onClick={() => setSheet('result')}>Указать результат вручную</button> : <p className="today-note">Предыдущее обращение уже обработано. Подгото��ка или копирование нового текста не изменяет его результат и не подтверждает отправку.</p>}
         </>}
 
         {current && sheet === 'result' && <>
           <fieldset className="today-result"><legend className="today-label">Результат контакта</legend>{results.map(value => <label key={value}><input type="radio" name="today-outcome" checked={outcome === value} onChange={() => { setOutcome(value); setFollowUp(''); }}/><span>{value}</span></label>)}</fieldset>
           {outcome === 'Не ответил' && <div className="today-followup"><label htmlFor="today-follow-up" className="today-label">Следующий контакт · необязательно</label><input id="today-follow-up" type="datetime-local" min={localDateTime()} value={followUp} onInput={e => setFollowUp(e.currentTarget.value)}/></div>}
-          {outcome === 'Написал сообщение' && <p className="today-note">Сохранится как результат, введённый вами. Подтверждения от провайдера нет.</p>}
+          {outcome === 'Написал сообщение' && <p className="today-note">Сохранится как результат, введённый ва��и. Подтверждения от провайдера нет.</p>}
           <label htmlFor="today-note" className="today-label">Заметка · необязательно</label>
           <textarea id="today-note" value={note} onChange={e => setNote(e.target.value)} rows={2} />
           {saveFailed && <div className="today-inline-error" role="alert"><span><strong>Результат не сохранён</strong><small>Попробуйте ещё раз. Ваши изменения пока не подтверждены.</small></span></div>}

@@ -33,7 +33,8 @@ export type WorkspaceAction =
   | { type: 'shieldHandoff'; itemIds: string[]; assignee: string }
   | { type: 'assign'; assignments: Record<string, string> }
   | { type: 'toggleTask'; taskId: string }
-  | { type: 'rescheduleTask'; taskId: string; dueAt: string }
+  | { type: 'setTaskKind'; taskId: string; kind: 'action' | 'promise' | 'waiting' }
+ | { type: 'rescheduleTask'; taskId: string; dueAt: string }
   | { type: 'draft'; itemId: string; value: string };
 
 export function createWorkspace(seed: Partial<Pick<Workspace, 'items' | 'tasks' | 'clients'>> = {}): Workspace {
@@ -302,7 +303,13 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
       return { ...state, tasks: state.tasks.map(value => value.id === task.id ? { ...value, done: !task.done, completedAt: task.done ? undefined : now, state: task.done ? 'Запланировано' : 'Выполнено вами' } : value),
         history: record(task.id, task.done ? 'Задача возвращена в план' : 'Задача отмечена выполненной', { clientId: task.clientId }) };
     }
-    case 'rescheduleTask': {
+    case 'setTaskKind': {
+ const task = state.tasks.find(value => value.id === action.taskId);
+ if (!task || task.done || !['action','promise','waiting'].includes(action.kind) || (task.followUpKind ?? 'action') === action.kind) return state;
+ const labels = {action:'Задача',promise:'Обещание клиенту',waiting:'Ожидаю ответ'};
+ return {...state,tasks:state.tasks.map(value => value.id === task.id ? {...value,followUpKind:action.kind} : value),history:record(task.id,`Тип задачи: ${labels[action.kind]}`,{clientId:task.clientId,scope:task.scope})};
+ }
+ case 'rescheduleTask': {
       const task = state.tasks.find(task => task.id === action.taskId);
       if (!task || task.done || !validDueAt(action.dueAt) || action.dueAt <= localDateTime(now)) return state;
       return { ...state, tasks: state.tasks.map(value => value.id === task.id ? { ...value, dueAt: action.dueAt, time: action.dueAt.slice(11), state: 'Срок перенесён вами' } : value),
