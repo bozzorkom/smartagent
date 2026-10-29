@@ -15,8 +15,13 @@
   gap: 18px;
   min-width: 0;
 }
-.property-hub .today-segment { margin-top: 0; }
-.property-hub .today-segment button[aria-pressed="true"] { background: #fff; box-shadow: 0 1px 3px #0001; }
+.property-hub .today-segment {
+  margin-top: 0;
+}
+.property-hub .today-segment button[aria-pressed="true"] {
+  background: #fff;
+  box-shadow: 0 1px 3px #0001;
+}
 .property-hub h2 {
   font-size: 1.875rem;
   line-height: 1.15;
@@ -98,7 +103,9 @@
   border-radius: 0;
   font-size: 0.875rem;
 }
-.property-search input::-webkit-search-cancel-button { display: none; }
+.property-search input::-webkit-search-cancel-button {
+  display: none;
+}
 .property-search svg {
   color: var(--property-muted);
   flex-shrink: 0;

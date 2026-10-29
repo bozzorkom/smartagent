@@ -80,7 +80,7 @@ export type DuplicateDecision = {
   kind: "same" | "different";
   previousPropertyId: string;
   movedListingIds: string[];
-  versions: Record<string,number>;
+  versions: Record<string, number>;
   at: string;
   undone?: boolean;
 };
@@ -372,9 +372,21 @@ export function canEditListing(listing: Listing, access: PropertyAccess) {
       listing.assignee === "Вы")
   );
 }
-export function isAssignedPropertyTask(task: Task, state: PropertyState, access: PropertyAccess) {
-  const listing=state.listings.find(value=>value.id===task.propertyListingId && value.scope===task.scope);
-  return Boolean(access.role==='agent' && task.assignee==='Вы' && listing && canEditListing(listing,access));
+export function isAssignedPropertyTask(
+  task: Task,
+  state: PropertyState,
+  access: PropertyAccess,
+) {
+  const listing = state.listings.find(
+    (value) =>
+      value.id === task.propertyListingId && value.scope === task.scope,
+  );
+  return Boolean(
+    access.role === "agent" &&
+    task.assignee === "Вы" &&
+    listing &&
+    canEditListing(listing, access),
+  );
 }
 export function displayAddress(
   property: Property,
@@ -474,9 +486,11 @@ export function requestTargets(
             .map((value) => value.trim())
             .filter(Boolean),
         }));
-      const primary: PropertyRequest[] = client.request.trim() && !captures.some(request => request.id === client.primaryRequestId)
-        ? [{ id: `client:${client.id}`, label: client.request }]
-        : [];
+      const primary: PropertyRequest[] =
+        client.request.trim() &&
+        !captures.some((request) => request.id === client.primaryRequestId)
+          ? [{ id: `client:${client.id}`, label: client.request }]
+          : [];
       const requests: PropertyRequest[] = [...primary, ...captures];
       return {
         id: client.id,
@@ -1202,7 +1216,11 @@ export function applyPropertyCommand(
         kind: command.decision,
         previousPropertyId: other.propertyId,
         movedListingIds: moved.map((l) => l.id),
-        versions: Object.fromEntries(next.listings.filter(l=>l.propertyId===listing!.propertyId).map(l=>[l.id,l.version])),
+        versions: Object.fromEntries(
+          next.listings
+            .filter((l) => l.propertyId === listing!.propertyId)
+            .map((l) => [l.id, l.version]),
+        ),
         at: now,
       },
     ];
