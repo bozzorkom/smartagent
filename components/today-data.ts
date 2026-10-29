@@ -27,7 +27,7 @@ export type Item = {
   capture?: { need: string; price: string; currency: string; districts: string; channel: string; next: string; dueAt: string; note: string };
 };
 
-export type Task = { assignee?: string; followUpKind?: 'action' | 'promise' | 'waiting'; id: string; time: string; title: string; context: string; state: string; done: boolean; custom?: boolean; dueAt?: string; clientId?: string; completedAt?: string; scope?: 'mine' | 'team'; callId?: string };
+export type Task = { reminderMinutes?: number | null; assignee?: string; followUpKind?: 'action' | 'promise' | 'waiting'; id: string; time: string; title: string; context: string; state: string; done: boolean; custom?: boolean; dueAt?: string; clientId?: string; completedAt?: string; scope?: 'mine' | 'team'; callId?: string };
 
 export const channelNames: Record<ChannelId, string> = {
   phone: 'Телефония',

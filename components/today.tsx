@@ -423,7 +423,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
 
   const status = problems.length
     ? { title: `${problems.length} ${plural(problems.length, 'канал требует', 'канала требуют', 'каналов требуют')} внимания`, caption: problems.map(id => channelNames[id]).join(', ') + ' · данные могут быть неполными', cta: 'Проверить', warn: true }
-    : delayed ? { title: 'Обновление Telegram задерживается', caption: 'Некоторые новые сообщения могут поя����иться позже.', cta: 'Проверить', warn: true }
+    : delayed ? { title: 'Обновление Telegram задерживается', caption: 'Некоторые новые сообщения могут поя������иться позже.', cta: 'Проверить', warn: true }
     : connected.length ? { title: 'Демо-каналы ��астроены', caption: 'Подключения имитируются. Реальные звонки и сообщения не поступают.', cta: '', warn: false }
     : channels.phone === 'manual' ? { title: 'Ручной учёт обращений', caption: 'Автоматические источники пока не подключены.', cta: 'Подключить', warn: false }
     : { title: 'Подключите рабочие каналы', caption: 'Звонки и сообщения из подключённых источников смогут появляться здесь.', cta: 'Настроить', warn: false };
@@ -526,7 +526,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
         </section>
       </>}
 
-      <details className="today-tests"><summary>Демо · состояния Today</summary>
+      <details className="today-tests"><summary>Демо · сост��яния Today</summary>
         <label htmlFor="today-scenario">Сценарий</label>
         <select id="today-scenario" value={scenario} onChange={e => changeScenario(e.target.value as Scenario)}>{Object.entries(scenarios).filter(([id]) => id !== 'newUser').map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
         {!sample && <button className="today-secondary" onClick={loadSample}>Показать пример рабочего дня</button>}
@@ -534,7 +534,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
         {accessLost && <p role="status">Доступ отозван. Действия заблокированы, черновики сохранены в памяти сеанса.</p>}
         <button className="today-secondary" onClick={() => receiveDemoEvent()}>Новое событие по клиенту</button>
         <button className="today-secondary" onClick={() => receiveDemoEvent(true)}>Повторная доставка события</button>
-        <p>Данные живут в памяти текущего входа. Перезагрузка или выход к телефону очищает сеанс. Пример добавляется явно и сохраняет ваши записи. События каналов видны только после настройки соответствующего демо-канала на ��тапе №04.</p>
+        <p>Данные живут в памяти текущего входа. Перезагрузка или выход к телефону очищает сеанс. Пример добавляется явно и сохраняет ваши записи. События каналов видны только после настройки соответствующего демо-кан��ла на ��тапе №04.</p>
       </details>
     </div>
 
@@ -566,7 +566,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <button className="today-option" onClick={()=>{clientReturn.current=null;callerReturn.current=[];openCaller();}}><Phone size={18}/>Звонки и Caller ID<ChevronRight size={18}/></button>
           <p className="today-note">Объекты, показы, сделки и расширенные настройки появятся отдельными экранами на следующих этапах.</p>
         </>}
-        {sheet === 'tasks' && <TaskWorkspace onAssign={(task,assignee)=>commit({type:'assignTask',taskId:task.id,assignee},'Ответственный за задачу назначен',false)} onKind={(task,kind)=>commit({type:'setTaskKind',taskId:task.id,kind},'Тип следующего шага сохранён',false)} tasks={todayTasks} now={new Date().toISOString()} view={taskViews[scope]} onViewChange={view=>setTaskViews(previous=>({...previous,[scope]:view}))} restricted={accessLost || (scope==='team'&&!isOwner)} team={scope==='team'} onOpen={task=>leaveTasks(()=>openTask(task),task.id)} onAdd={()=>leaveTasks(()=>openAdd('task'))}/>}
+        {sheet === 'tasks' && <TaskWorkspace onReminder={(task,minutes)=>commit({type:'setTaskReminder',taskId:task.id,minutes},'Демо-напоминание обновлено',false)} onAssign={(task,assignee)=>commit({type:'assignTask',taskId:task.id,assignee},'Ответственный за задачу назначен',false)} onKind={(task,kind)=>commit({type:'setTaskKind',taskId:task.id,kind},'Тип следующего шага сохранён',false)} tasks={todayTasks} now={new Date().toISOString()} view={taskViews[scope]} onViewChange={view=>setTaskViews(previous=>({...previous,[scope]:view}))} restricted={accessLost || (scope==='team'&&!isOwner)} team={scope==='team'} onOpen={task=>leaveTasks(()=>openTask(task),task.id)} onAdd={()=>leaveTasks(()=>openAdd('task'))}/>}
         {sheet === 'shield' && <LeadShield items={list} tasks={todayTasks} view={shieldView} onViewChange={change => setShieldView(previous => ({...previous,...change}))} team={scope === 'team' && isOwner} canHandoff={isOwner} restricted={accessLost} incomplete={incomplete} connectedCount={connected.length} phoneConnected={phoneData} handlers={{
           onOpen:(item, destination) => leaveShield(() => { openItem(item); if (!item.callId) setSheet(destination); }),
           onClient:item => leaveShield(() => openClient(item)),

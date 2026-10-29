@@ -34,7 +34,8 @@ export type WorkspaceAction =
   | { type: 'shieldHandoff'; itemIds: string[]; assignee: string }
   | { type: 'assign'; assignments: Record<string, string> }
   | { type: 'toggleTask'; taskId: string }
-  | { type: 'assignTask'; taskId: string; assignee: string }
+  | { type: 'setTaskReminder'; taskId: string; minutes: number | null }
+ | { type: 'assignTask'; taskId: string; assignee: string }
  | { type: 'setTaskKind'; taskId: string; kind: 'action' | 'promise' | 'waiting' }
  | { type: 'rescheduleTask'; taskId: string; dueAt: string }
   | { type: 'draft'; itemId: string; value: string };
@@ -101,6 +102,13 @@ export function validDueAt(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(value)) return false;
   const parsed = new Date(`${value}:00+05:00`);
   return !Number.isNaN(parsed.getTime()) && localDateTime(parsed.toISOString()) === value;
+}
+
+export function taskReminder(task: Pick<Task, 'done' | 'dueAt' | 'reminderMinutes'>, now: string) {
+ if (task.done || task.reminderMinutes == null) return {status:'off' as const};
+ if (!task.dueAt || !validDueAt(task.dueAt) || ![0,15,60,1440].includes(task.reminderMinutes)) return {status:'no-date' as const};
+ const at = new Date(Date.parse(`${task.dueAt}:00+05:00`) - task.reminderMinutes * 60000).toISOString();
+ return {status:Date.parse(now) >= Date.parse(at) ? 'due' as const : 'scheduled' as const, at};
 }
 
 export function taskDay(task: Pick<Task, 'done' | 'dueAt'>, now = new Date().toISOString()) {
@@ -304,6 +312,11 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
       if (!task) return state;
       return { ...state, tasks: state.tasks.map(value => value.id === task.id ? { ...value, done: !task.done, completedAt: task.done ? undefined : now, state: task.done ? 'Запланировано' : 'Выполнено вами' } : value),
         history: record(task.id, task.done ? 'Задача возвращена в план' : 'Задача отмечена выполненной', { clientId: task.clientId }) };
+    }
+    case 'setTaskReminder': {
+      const task = state.tasks.find(value=>value.id===action.taskId);
+      if (!task || task.done || (task.reminderMinutes ?? null) === action.minutes || (action.minutes !== null && (![0,15,60,1440].includes(action.minutes) || !task.dueAt || !validDueAt(task.dueAt)))) return state;
+      return {...state,tasks:state.tasks.map(value=>value.id===task.id ? {...value,reminderMinutes:action.minutes} : value),history:record(task.id,action.minutes === null ? 'Демо-напоминание выключено' : `Демо-напоминание: за ${action.minutes} мин. до срока`,{clientId:task.clientId,scope:task.scope})};
     }
     case 'assignTask': {
       const task = state.tasks.find(value => value.id === action.taskId);
