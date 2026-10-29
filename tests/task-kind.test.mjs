@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorkspace,reduceWorkspace} from '../components/today-state.ts';
+test('assignment validates employee, team scope, completion and repeated saves',()=>{
+ const task={id:'assign',title:'Позвонить',time:'10:00',context:'Клиент',state:'Открыто',done:false,scope:'team'};
+ const state={...createWorkspace(),tasks:[task]};
+ const action={type:'assignTask',taskId:task.id,assignee:'Анна'};
+ const next=reduceWorkspace(state,action);
+ assert.equal(next.tasks[0].assignee,'Анна'); assert.equal(next.history[0].scope,'team');
+ assert.equal(reduceWorkspace(next,action),next);
+ assert.equal(reduceWorkspace(state,{...action,assignee:'Unknown'}),state);
+ for(const value of [{...task,scope:'mine'},{...task,done:true}]) {const blocked={...state,tasks:[value]};assert.equal(reduceWorkspace(blocked,action),blocked);}
+});
 test('waiting preserves deadline and completion and records scoped history',()=>{
  const task={id:'follow',title:'Позвонить',time:'10:00',dueAt:'2026-11-01T10:00',context:'Клиент',state:'Открыто',done:false,scope:'team'};
  const state={...createWorkspace(),tasks:[task]};

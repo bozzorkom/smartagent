@@ -1,4 +1,5 @@
 import type { Item, Task, ChannelId } from './today-data';
+import { employees } from './today-data.ts';
 import { captureError, type Capture } from './quick-capture-model.ts';
 import type { CallEvent, CallRecord, CallOutcome, CallStatus } from './caller-data';
 
@@ -33,7 +34,8 @@ export type WorkspaceAction =
   | { type: 'shieldHandoff'; itemIds: string[]; assignee: string }
   | { type: 'assign'; assignments: Record<string, string> }
   | { type: 'toggleTask'; taskId: string }
-  | { type: 'setTaskKind'; taskId: string; kind: 'action' | 'promise' | 'waiting' }
+  | { type: 'assignTask'; taskId: string; assignee: string }
+ | { type: 'setTaskKind'; taskId: string; kind: 'action' | 'promise' | 'waiting' }
  | { type: 'rescheduleTask'; taskId: string; dueAt: string }
   | { type: 'draft'; itemId: string; value: string };
 
@@ -302,6 +304,11 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
       if (!task) return state;
       return { ...state, tasks: state.tasks.map(value => value.id === task.id ? { ...value, done: !task.done, completedAt: task.done ? undefined : now, state: task.done ? 'Запланировано' : 'Выполнено вами' } : value),
         history: record(task.id, task.done ? 'Задача возвращена в план' : 'Задача отмечена выполненной', { clientId: task.clientId }) };
+    }
+    case 'assignTask': {
+      const task = state.tasks.find(value => value.id === action.taskId);
+      if (!task || task.scope !== 'team' || task.done || !employees.includes(action.assignee) || task.assignee === action.assignee) return state;
+      return {...state,tasks:state.tasks.map(value => value.id === task.id ? {...value,assignee:action.assignee} : value),history:record(task.id,`Ответственный за задачу: ${action.assignee}`,{clientId:task.clientId,scope:'team'})};
     }
     case 'setTaskKind': {
  const task = state.tasks.find(value => value.id === action.taskId);
