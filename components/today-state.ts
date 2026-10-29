@@ -273,8 +273,8 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
   const ids = [...new Set(action.itemIds)].filter(id => state.items.some(value => value.id === id && !value.callId) && !state.resolved.includes(id));
   if (!ids.length || ids.length !== new Set(action.itemIds).size || !action.outcome.trim()) return state;
   const first = state.items.find(value => value.id === ids[0])!;
-  return { ...state, resolved: [...state.resolved, ...ids],
-    history: record(first.id, ids.length > 1 ? `Результат отмечен по ${ids.length} событиям` : 'Результат отмечен вами', { clientId: first.clientId, outcome: action.outcome, note: action.note.trim() || 'Результат указал пользователь' }) };
+  return { ...state, resolved: action.outcome === 'Не ответил' ? state.resolved : [...state.resolved, ...ids],
+    history: record(first.id, ids.length > 1 ? `Результат отмечен по ${ids.length} событиям` : 'Результат отмечен вами', { clientId: first.clientId, scope: first.scope, outcome: action.outcome, note: action.note.trim() || 'Результат указал пользователь' }) };
   }
     case 'shieldNeedsReply':
   if (!open || item.kind !== 'review' || item.callId) return state;
@@ -283,7 +283,7 @@ export function reduceWorkspace(state: Workspace, action: WorkspaceAction, now =
     case 'shieldHandoff': {
   const ids = [...new Set(action.itemIds)];
   const targets = state.items.filter(value => ids.includes(value.id) && value.scope === 'team' && !value.callId && !state.resolved.includes(value.id));
-  if (!action.assignee.trim() || targets.length !== ids.length || targets.every(value => value.assignee === action.assignee)) return state;
+  if (!ids.length || !action.assignee.trim() || targets.length !== ids.length || targets.every(value => value.assignee === action.assignee)) return state;
   return { ...state, items: state.items.map(value => targets.includes(value) ? { ...value, assignee: action.assignee } : value),
     history: record(targets[0].id, `Передано сотруднику: ${action.assignee}`, { clientId: targets[0].clientId, scope: 'team' }) };
   }

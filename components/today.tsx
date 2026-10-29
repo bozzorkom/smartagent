@@ -6,6 +6,8 @@ import {
   UserPlus, UsersRound, WifiOff, X,
 } from 'lucide-react';
 import './today.css';
+import { LeadShield } from './lead-shield';
+import { defaultShieldView } from './lead-shield-model';
 import { QuickCapture } from './quick-capture';
 import { emptyCapture } from './quick-capture-model';
 import { CrmInbox, defaultInboxView, type InboxView } from './crm-inbox';
@@ -24,7 +26,7 @@ const kindIcons: Record<Kind, typeof Phone> = {
 };
 const channelIcons: Record<ChannelId, typeof Phone> = { phone: Phone, telegram: Send, whatsapp: MessageCircle, instagram: Instagram };
 const channelIds = Object.keys(channelNames) as ChannelId[];
-type Sheet = 'action' | 'result' | 'reply' | 'reschedule' | 'assign' | 'add' | 'profile' | 'denied' | 'clients' | 'client' | 'history' | 'inbox' | 'more' | 'task' | 'plan' | 'caller' | null;
+type Sheet = 'shield' | 'action' | 'result' | 'reply' | 'reschedule' | 'assign' | 'add' | 'profile' | 'denied' | 'clients' | 'client' | 'history' | 'inbox' | 'more' | 'task' | 'plan' | 'caller' | null;
 type Filter = 'reply' | 'missed' | null;
 type Undo = { message: string; restore: () => void } | null;
 type AddType = 'client' | 'lead' | 'task';
@@ -223,12 +225,13 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
   function replace(next: Workspace) { model.current = next; setWorkspace(next); }
   function commit(action: WorkspaceAction, message: string, close = true) {
     const access = accessRef.current;
+    if ('itemIds' in action && action.itemIds.some(id => { const item = model.current.items.find(value => value.id === id); return !item || (item.scope === 'team' && !access.owner); })) { setSheet('denied'); return false; }
     const targetScope = 'callId' in action ? model.current.calls.find(call=>call.id===action.callId)?.scope : action.type==='callEvent'?action.event.scope:action.type === 'addTask' ? action.task.scope : action.type === 'addLead' ? action.item.scope : 'clientId' in action ? model.current.clients.find(client => client.id === action.clientId)?.scope : 'itemId' in action ? model.current.items.find(item => item.id === action.itemId)?.scope : 'taskId' in action ? model.current.tasks.find(task => task.id === action.taskId)?.scope : undefined;
     if (access.lost || ((targetScope === 'team' || action.type === 'assign') && !access.owner)) { setSheet('denied'); return false; }
     if (access.offline) { setFormError('Нет сети. Изменение не сохранено; черновик остаётся в этом сеансе.'); notify('Нет сети: действие не сохранено.'); return false; }
     const before = model.current, next = reduceWorkspace(before, action);
     if (before === next) { setFormError('Изменение не сохранено. Проверьте данные и актуальность действия.'); return false; }
-    replace(next); if (close) { if (clientReturn.current) returnToClient(true); else if (inboxReturn.current) returnToInbox(true); else { setSheet(null); setFilter(null); } } setFormError('');
+    replace(next); if (close) { if (clientReturn.current) returnToClient(true); else if (inboxReturn.current) returnToInbox(true); else if (shieldReturn.current) returnToShield(); else { setSheet(null); setFilter(null); } } setFormError('');
     notify(`${message} · в демо-сеансе`, { message, restore: () => {
       if (accessRef.current.lost || accessRef.current.offline || (targetScope === 'team' && !accessRef.current.owner)) return notify('Отмена недоступна: проверьте доступ и соединение.');
       if (model.current !== next) return notify('После этого изменения есть новые данные. Отмена недоступна.');
@@ -236,6 +239,10 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     } });
     return true;
   }
+  const [shieldView, setShieldView] = useState({...defaultShieldView});
+  const shieldReturn = useRef(false);
+  function leaveShield(action: () => void) { shieldReturn.current = true; action(); }
+  function returnToShield() { shieldReturn.current = false; setSheet('shield'); setFormError(''); }
   const clientReturn = useRef<ClientOrigin | null>(null);
   function openInboxItem(item: Item) {
     inboxReturn.current = { scope, itemId: item.id, scroll: dialog.current?.scrollTop ?? 0 };
@@ -279,6 +286,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
       requestAnimationFrame(()=>{if(dialog.current)dialog.current.scrollTop=target.scroll;});return;
     }
     if (inboxReturn.current) return returnToInbox();
+    if (shieldReturn.current) return returnToShield();
     setSheet(null);setFilter(null);setFormError('');
   }
   function openClient(item?: Item) {
@@ -546,10 +554,20 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <h2 id="today-sheet-title" className="today-h2">{sheet === 'profile' ? 'Ваше пространство' : 'Ещё'}</h2>
           <p className="today-muted">{context}. Роль: {role === 'owner' ? 'руководитель' : role === 'agent' ? 'сотрудник' : 'самостоятельная работа'}. Выбор роли не создаёт агентство и не предоставляет доступ к чужим данным.</p>
           <button className="today-option" onClick={() => { setSheet(null); onChannels(); }}>Рабочие каналы<ChevronRight size={18} /></button>
+          <button className="today-option" onClick={() => setSheet('shield')}>Lead Shield · восстановить контакт<ChevronRight size={18}/></button>
           <button className="today-option" onClick={() => setSheet('history')}>Журнал действий<ChevronRight size={18} /></button>
           <button className="today-option" onClick={()=>{clientReturn.current=null;callerReturn.current=[];openCaller();}}><Phone size={18}/>Звонки и Caller ID<ChevronRight size={18}/></button>
           <p className="today-note">Объекты, показы, сделки и расширенные настройки появятся отдельными экранами на следующих этапах.</p>
         </>}
+        {sheet === 'shield' && <LeadShield items={list} tasks={todayTasks} view={shieldView} onViewChange={change => setShieldView(previous => ({...previous,...change}))} team={scope === 'team' && isOwner} canHandoff={isOwner} restricted={accessLost} incomplete={incomplete} connectedCount={connected.length} phoneConnected={phoneData} handlers={{
+          onOpen:(item, destination) => leaveShield(() => { openItem(item); if (!item.callId) setSheet(destination); }),
+          onClient:item => leaveShield(() => openClient(item)),
+          onTask:item => leaveShield(() => { setCurrent(item); setForm({title:'Связаться с клиентом',detail:item.context,date:workspaceDate(),time:'',clientId:item.clientId ?? ''}); setAddType('task');setSheet('add'); }),
+          onResolve:(entries,outcome) => { commit({type:'shieldResolve',itemIds:entries.map(item=>item.id),outcome,note:'Результат указал пользователь'},'Результат записан',false); },
+          onNeedsReply:item => { commit({type:'shieldNeedsReply',itemId:item.id},'Отмечено: ответ нужен',false); },
+          onHandoff:(entries,assignee) => { commit({type:'shieldHandoff',itemIds:entries.map(item=>item.id),assignee},'Ответственный назначен',false); },
+          onChannels:() => {setSheet(null);onChannels();}, onInbox:()=>setSheet('inbox'), onHistory:()=>leaveShield(()=>setSheet('history')), onAdd:()=>leaveShield(()=>openAdd('lead')), onOpenTask:task=>leaveShield(()=>openTask(task))
+        }}/>}
         {sheet === 'inbox' && <CrmInbox items={list} view={inboxViews[scope]} onViewChange={updateInboxView} incomplete={incomplete} phoneConnected={phoneData} restricted={accessLost} team={scope === 'team' && isOwner} onOpen={openInboxItem} onChannels={() => { closeSheet(); onChannels(); }} onAdd={() => openAdd('lead')}/>}
         {sheet === 'plan' && <><h2 id="today-sheet-title" className="today-h2">Весь план · {planCount}</h2><p className="today-muted">{scope === 'team' ? `Просроченные сигналы: ${planItems.length} · Датированные задачи: ${todayTasks.length}.` : `Невыполненные: ${pendingTasks.length} · Завершённые: ${todayTasks.length - pendingTasks.length}. Счётчик на главной показывает только задачи, срок которых ещё наступит сегодня.`}</p>{scope === 'team' && <section><h3 className="today-label">Просроченные действия · {planItems.length}</h3>{planItems.length ? <div className="today-list">{planItems.map(item => <ActionCard key={item.id} item={item} onOpen={() => openItem(item)} onMenu={() => openItem(item)}/>)}</div> : <p className="today-muted">Нет действий в этой группе.</p>}</section>}{[['Просрочено', overdueTasks], ['Сегодня', openTasks], ['Позже', futureTasks], ['Без срока', undatedTasks], ['Выполнено сегодня', doneTasks], ['Выполнено ранее', archivedTasks]].map(([label, group]) => <section key={label as string}><h3 className="today-label">{label as string} · {(group as Task[]).length}</h3>{(group as Task[]).length ? <DatedTasks tasks={group as Task[]} onToggle={toggleTask} onOpen={openTask}/> : <p className="today-muted">Нет задач в этой группе.</p>}</section>)}</>}
         {sheet === 'clients' && (accessLost ? <><h2 id="today-sheet-title">Доступ ограничен</h2><p className="today-muted">Список клиентов скрыт до восстановления демо-доступа.</p></> : <><h2 id="today-sheet-title" className="today-h2">Клиенты в этом сеансе</h2><p className="today-muted">Быстрый список Today · данные до перезагрузки.</p>{clients.filter(client => !client.archived && (client.scope === 'mine' || (isOwner && teamData && scope === 'team'))).map(client => <button className="today-option" key={client.id} onClick={() => { setClientId(client.id); setCurrent(null); setSheet('client'); }}><span><strong>{client.name}</strong><small>{client.request || 'Запрос не указан'}</small></span><ChevronRight size={18}/></button>)}<button className="today-secondary" onClick={() => openAdd('client')}>Добавить клиента</button></>)}
