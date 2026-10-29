@@ -380,7 +380,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     if (addType === 'task') {
       const dueAt = `${form.date}T${form.time}`;
       if (!validDueAt(dueAt)) return setFormError('Укажите дату и время задачи.');
-      saved = commit({ type: 'addTask', task: { id, time: form.time, dueAt, title: form.title.trim(), context: form.detail.trim() || 'Без привязки к клиенту', clientId: form.clientId || undefined, scope: clients.find(value => value.id === form.clientId)?.scope ?? 'mine', state: 'Создано вами', done: false, custom: true } }, 'Задача создана');
+      saved = commit({ type: 'addTask', task: { id, time: form.time, dueAt, title: form.title.trim(), context: form.detail.trim() || 'Без привязки к клиенту', clientId: form.clientId || undefined, scope: clients.find(value => value.id === form.clientId)?.scope ?? scope, state: 'Создано вами', done: false, custom: true } }, 'Задача создана');
     }
     if (addType === 'lead') saved = commit({ type: 'addLead', item: { id, kind: 'review', scope: clients.find(value => value.id === form.clientId)?.scope ?? 'mine', type: 'Добавлено вручную', title: 'Обработать обращение', context: form.title.trim(), source: 'Добавлено вами', time: `Сегодня, ${clock.time}`, note: form.detail.trim() || 'Следующий шаг не указан.', cta: 'Открыть обращение', reason: 'Вы добавили обращение вручную. Результат обработки пока не отмечен.', due: Date.now(), rank: 2, custom: true, clientId: form.clientId || undefined } }, 'Обращение добавлено');
     if (addType === 'client') {
@@ -423,7 +423,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
 
   const status = problems.length
     ? { title: `${problems.length} ${plural(problems.length, 'канал требует', 'канала требуют', 'каналов требуют')} внимания`, caption: problems.map(id => channelNames[id]).join(', ') + ' · данные могут быть неполными', cta: 'Проверить', warn: true }
-    : delayed ? { title: 'Обновление Telegram задерживается', caption: 'Некоторые новые сообщения могут поя��������иться позже.', cta: 'Проверить', warn: true }
+    : delayed ? { title: 'Обновление Telegram задерживается', caption: 'Некоторые новые сообщения могут поя����������иться позже.', cta: 'Проверить', warn: true }
     : connected.length ? { title: 'Демо-каналы ��астроены', caption: 'Подключения имитируются. Реальные звонки и сообщения не поступают.', cta: '', warn: false }
     : channels.phone === 'manual' ? { title: 'Ручной учёт обращений', caption: 'Автоматические источники пока не подключены.', cta: 'Подключить', warn: false }
     : { title: 'Подключите рабочие каналы', caption: 'Звонки и сообщения из подключённых источников смогут появляться здесь.', cta: 'Настроить', warn: false };
@@ -490,7 +490,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           {primaryItem
             ? <ActionCard item={primaryItem} hero onOpen={() => openItem(primaryItem)} onMenu={() => openItem(primaryItem)} />
             : primaryTask && <TaskActionCard task={primaryTask} onOpen={() => openTask(primaryTask)} />}
-          {scenario !== 'noAi' && mine.find(i => i.id === 'p32') && <div className="today-ai"><Sparkles size={17} /><div><strong>Подсказка SuperApp</strong><p>Вы обещали отправить подборку клиенту №32. Можно начать с короткого сообщения.</p><button className="today-link" onClick={() => openItem(mine.find(i => i.id === 'p32')!, 'reply')}>Под��отовить ответ</button></div></div>}
+          {scenario !== 'noAi' && mine.find(i => i.id === 'p32') && <div className="today-ai"><Sparkles size={17} /><div><strong>Подсказка SuperApp</strong><p>Вы обещали отправить подборку клиенту №32. Можно начать с короткого сообщения.</p><button className="today-link" onClick={() => openItem(mine.find(i => i.id === 'p32')!, 'reply')}>��од��отовить ответ</button></div></div>}
           {scenario === 'noAi' && <p className="today-note">Подсказки временно недоступны. Задачи и события работают как обычно.</p>}
         </section>}
 
@@ -534,7 +534,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
         {accessLost && <p role="status">Доступ отозван. Действия заблокированы, черновики сохранены в памяти сеанса.</p>}
         <button className="today-secondary" onClick={() => receiveDemoEvent()}>Новое событие по клиенту</button>
         <button className="today-secondary" onClick={() => receiveDemoEvent(true)}>Повторная доставка события</button>
-        <p>Данные живут в памяти текущего входа. Перезагрузка или выход к телефону очищает сеанс. Пример добавляется явно и сохраняет ваши записи. События каналов видны только после настройки соответствующего демо-кан��ла на ��тапе №04.</p>
+        <p>Данные живут в памяти текущего входа. Перезагрузка или выход к телефону очищает сеанс. Пример добавляется явно и сохраняет ваши записи. События каналов видны только после настройки соответствующе��о демо-кан��ла на ��тапе №04.</p>
       </details>
     </div>
 
@@ -612,7 +612,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <div className="today-extra">
             <button onClick={() => setSheet('reschedule')}>Перенести</button>
             <button onClick={() => commit({ type: 'dismiss', itemId: current.id }, 'Отмечено как неактуальное')}>Неактуально</button>
-            <button onClick={() => openClient(current)}>Открыть клиента</button>
+            <button onClick={() => openClient(current)}>Откры��ь клиента</button>
             {role === 'agent' && <button onClick={() => setSheet('denied')}>Не мой клиент</button>}
           </div>
         </>}
@@ -623,7 +623,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
           <textarea id="today-draft" value={draft} onChange={e => { setDraft(e.target.value); replace(reduceWorkspace(model.current, { type: 'draft', itemId: current.id, value: e.target.value })); }} rows={5} />
           <p className="today-muted">Черновик остаётся при закрытии панели. Отправка и переход к личному диалогу в демо не подключены.</p>
           <button className="today-primary" disabled={!draft.trim()} onClick={copyDraft}>Скопировать текст</button>
-          {!resolved.includes(current.id) ? <button className="today-secondary" onClick={() => setSheet('result')}>Указать результат вручную</button> : <p className="today-note">Предыдущее обращение уже обработано. Подгото����а или копирование нового текста не изменяет его результат и не подтверждает отправку.</p>}
+          {!resolved.includes(current.id) ? <button className="today-secondary" onClick={() => setSheet('result')}>Указать результат вручную</button> : <p className="today-note">Предыдущее обращение уже обработано. Подгото����а или копирование нового текста не изменяет его результат и не подтверждает о��правку.</p>}
         </>}
 
         {current && sheet === 'result' && <>
