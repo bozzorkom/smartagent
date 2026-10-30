@@ -49,6 +49,7 @@ import {
   type PropertyView,
   type ReviewDraft,
 } from "./property-model";
+import { PropertyLinkPanel } from "./property-link-panel";
 import "./property-hub.css";
 
 export type PropertyPanel = {
@@ -63,6 +64,7 @@ export type PropertyPanel = {
     | "status"
     | "archive"
     | "link"
+    | "selection"
     | "task"
     | "duplicates"
     | "settings"
@@ -91,6 +93,7 @@ export type PropertySession = {
   scroll: number;
   focusId: string;
   selected: string[];
+  linkSelection: { id: string; version: number }[];
 };
 export function createPropertySession(): PropertySession {
   return {
@@ -108,6 +111,7 @@ export function createPropertySession(): PropertySession {
     scroll: 0,
     focusId: "",
     selected: [],
+    linkSelection: [],
   };
 }
 export function requestPropertyView(
@@ -122,7 +126,7 @@ export function requestPropertyView(
       maxPrice:
         request?.operation && request?.price ? String(request.price) : "",
       currency: request?.currency ?? "USD",
-      unit: request?.operation === "rent" ? "month" : "total",
+      unit: request?.unit ?? (request?.operation === "rent" ? "month" : "total"),
       districts: request?.districts ?? [],
     },
   };
@@ -210,6 +214,7 @@ export function PropertyHub({
       panel.type === "filters" ||
         panel.type === "create" ||
         panel.type === "settings" ||
+        panel.type === "selection" ||
         panel.type === "detail"
         ? { type: "list" }
         : { type: "detail", id: panel.id },
@@ -239,6 +244,10 @@ export function PropertyHub({
         return;
       }
       const change: Partial<PropertySession> = { panel: next };
+      if (command.type === "linkMany" && panel.type === "selection") {
+        change.selected = [];
+        change.linkSelection = [];
+      }
       if (command.type === "create" || command.type === "edit") {
         const drafts = { ...s.drafts };
         delete drafts[
@@ -495,7 +504,7 @@ export function PropertyHub({
       {panel.type !== "list" && (
         <button className="property-back" disabled={busy} onClick={back}>
           <ArrowLeft size={16} />
-          {["detail", "create", "filters", "settings"].includes(panel.type)
+          {["detail", "create", "filters", "settings", "selection"].includes(panel.type)
             ? "Назад к каталогу"
             : "Назад к объекту"}
         </button>
@@ -857,67 +866,42 @@ export function PropertyHub({
                 className="today-primary"
                 disabled={busy}
                 onClick={() => {
-                  const chosen = s.selected.map((id) =>
-                    state.listings.find(
-                      (l) =>
-                        l.id === id &&
-                        canViewListing(l, access) &&
-                        l.scope === s.scope &&
-                        !l.archived &&
-                        l.status === "available",
-                    ),
-                  );
-                  if (chosen.some((l) => !l)) {
-                    setError(
-                      "Один из объектов стал недоступен. Пересмотрите выбор.",
-                    );
-                    return;
-                  }
-                  const errors: string[] = [];
-                  let added = 0;
-                  for (const l of chosen) {
-                    if (
-                      state.links.some(
-                        (link) =>
-                          link.listingId === l!.id &&
-                          link.clientId === context.id &&
-                          link.requestId === request.id,
-                      )
-                    )
-                      continue;
-                    const error = onCommand({
-                      type: "link",
-                      operationId: crypto.randomUUID(),
-                      id: l!.id,
-                      version: l!.version,
-                      clientId: context.id,
-                      requestId: request.id,
-                    });
-                    if (error) {
-                      errors.push(error);
-                      break;
-                    }
-                    added++;
-                  }
-                  if (errors.length)
-                    setError(
-                      `${added ? "Часть связей уже сохранена. " : ""}${errors[0]}`,
-                    );
-                  else {
-                    onChange({ selected: [] });
-                    setNotice(
-                      added
-                        ? `Связано с запросом: ${added}. Сообщения не отправлялись.`
-                        : "Выбранные объекты уже связаны с запросом.",
-                    );
-                  }
+                  onChange({
+                    linkSelection: s.selected.map((id) => ({
+                      id,
+                      version: state.listings.find((value) => value.id === id)?.version ?? 0,
+                    })),
+                  });
+                  navigate({ type: "selection", id: s.selected[0] });
                 }}
               >
-                Добавить к запросу · {s.selected.length}
+                Проверить выбор · {s.selected.length}
               </button>
+              <button className="today-link" onClick={() => onChange({ selected: [] })}>Сбросить</button>
             </div>
           )}
         </>
+      )}
+      {panel.type === "selection" && (
+        <PropertyLinkPanel
+          targets={visibleTargets}
+          state={state}
+          access={access}
+          selections={s.linkSelection}
+          initialClient={s.contextClientId}
+          initialRequest={s.contextRequestId}
+          busy={busy}
+          now={now}
+          onRemove={(id) => onChange({
+            selected: s.selected.filter((value) => value !== id),
+            linkSelection: s.linkSelection.filter((value) => value.id !== id),
+          })}
+          onRefresh={(linkSelection) => onChange({ linkSelection })}
+          onSave={(clientId, requestId) => run({
+            type: "linkMany", operationId: crypto.randomUUID(), scope: s.scope,
+            selections: s.linkSelection, clientId, requestId,
+          }, { type: "list" }, "Выбранные объекты связаны с запросом. Повторные связи пропущены; сообщения не отправлялись.")}
+        />
       )}
       {panel.type === "filters" && (
         <PropertyFiltersPanel
@@ -1021,7 +1005,7 @@ export function PropertyHub({
           </section>
         </>
       )}
-      {!["list", "filters", "create", "settings"].includes(panel.type) &&
+      {!["list", "filters", "create", "settings", "selection"].includes(panel.type) &&
       (!listing || !property) ? (
         <>
           <h2 id="today-sheet-title">Объект недоступен</h2>
@@ -1488,14 +1472,17 @@ export function PropertyHub({
               <PropertyLinkPanel
                 key={listing.id}
                 targets={visibleTargets}
-                listing={listing}
                 state={state}
+                access={access}
+                selections={[{ id: listing.id, version: panel.version ?? listing.version }]}
                 initialClient={s.contextClientId}
                 initialRequest={s.contextRequestId}
                 busy={busy}
+                now={now}
+                onRefresh={() => onChange({ panel: { ...panel, version: listing.version } })}
                 onSave={(clientId, requestId) =>
                   run(
-                    { ...cmd("link"), type: "link", clientId, requestId },
+                    { type: "linkMany", operationId: crypto.randomUUID(), scope: s.scope, selections: [{ id: listing.id, version: panel.version ?? listing.version }], clientId, requestId },
                     { type: "detail", id: listing.id },
                     "Объект связан с запросом. Сообщение не отправлено.",
                   )
@@ -1779,7 +1766,7 @@ export function PropertyHub({
               )}
             {panel.version != null &&
               listing.version !== panel.version &&
-              !["detail", "menu"].includes(panel.type) && (
+                                !["detail", "menu", "link"].includes(panel.type) && (
                 <div className="property-banner" role="alert">
                   <strong>Объект был изменён</strong>
                   <p>
@@ -1823,158 +1810,5 @@ export function PropertyHub({
         Связать ≠ отправить · Выполнить задачу ≠ подтвердить актуальность
       </p>
     </div>
-  );
-}
-function PropertyLinkPanel({
-  targets,
-  listing,
-  state,
-  initialClient,
-  initialRequest,
-  busy,
-  onSave,
-}: {
-  targets: PropertyTarget[];
-  listing: Listing;
-  state: PropertyState;
-  initialClient: string;
-  initialRequest: string;
-  busy: boolean;
-  onSave: (clientId: string, requestId: string) => void;
-}) {
-  const [query, setQuery] = useState(""),
-    [clientId, setClientId] = useState(initialClient),
-    [requestId, setRequestId] = useState(initialRequest),
-    [ack, setAck] = useState(false);
-  const target = targets.find((t) => t.id === clientId),
-    request = target?.requests.find((r) => r.id === requestId);
-  const exists = state.links.some(
-    (l) =>
-      l.listingId === listing.id &&
-      l.clientId === clientId &&
-      l.requestId === requestId,
-  );
-  return (
-    <form
-      className="property-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (target && request && ack) onSave(clientId, requestId);
-      }}
-    >
-      <h2 id="today-sheet-title">Для какого клиента?</h2>
-      <p className="today-muted">
-        Объект №{listing.id} · {priceLabel(listing)} ·{" "}
-        {statusLabels[listing.status]}
-      </p>
-      <PropertyField label="Найти клиента">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Имя клиента"
-        />
-      </PropertyField>
-      <PropertyField label="Клиент">
-        <select
-          required
-          value={clientId}
-          onChange={(e) => {
-            setClientId(e.target.value);
-            setRequestId("");
-            setAck(false);
-          }}
-        >
-          <option value="">Выберите клиента</option>
-          {targets
-            .filter((t) => t.name.toLowerCase().includes(query.toLowerCase()))
-            .map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-        </select>
-      </PropertyField>
-      {!targets.length && (
-        <p className="property-info">
-          В этом пространстве нет клиентов. Добавьте клиента и запрос в разделе
-          «Клиенты», затем вернитесь к объекту.
-        </p>
-      )}
-      {target && (
-        <PropertyField label="Запрос клиента">
-          <select
-            required
-            value={requestId}
-            onChange={(e) => {
-              setRequestId(e.target.value);
-              setAck(false);
-            }}
-          >
-            <option value="">Выберите запрос</option>
-            {target.requests.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </PropertyField>
-      )}
-      {target && !target.requests.length && (
-        <p className="property-info">
-          У клиента нет сохранённого запроса. Сначала уточните его потребность в
-          Client 360°.
-        </p>
-      )}
-      {request && (
-        <>
-          <p className="property-info">
-            {target!.name} · {request.label}
-            <br />
-            Совпадение по всем условиям не проверяется автоматически.
-            Неизвестные параметры нужно уточнить.{" "}
-            {request.price &&
-            listing.price &&
-            listing.currency === request.currency &&
-            listing.price > request.price
-              ? "Внимание: цена превышает сохранённый бюджет."
-              : ""}{" "}
-            {request.operation && request.operation !== listing.operation
-              ? "Внимание: операция отличается от запроса."
-              : ""}
-          </p>
-          <label className="property-check">
-            <input
-              type="checkbox"
-              checked={ack}
-              onChange={(e) => setAck(e.target.checked)}
-            />
-            <span>
-              Я проверил выбранный запрос и связываю этот объект вручную.
-              Сообщение отправлено не будет.
-            </span>
-          </label>
-        </>
-      )}
-      {exists && (
-        <p role="status" className="property-info">
-          Объект уже связан с этим запросом.
-        </p>
-      )}
-      <button
-        disabled={
-          busy ||
-          exists ||
-          !request ||
-          !ack ||
-          listing.archived ||
-          listing.status !== "available"
-        }
-        className="today-primary"
-        type="submit"
-      >
-        Добавить к запросу
-      </button>
-    </form>
   );
 }
