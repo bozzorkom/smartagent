@@ -330,7 +330,7 @@ export function Today({ channels, role, active, onChannels }: { channels: Channe
     if(sheet==='properties'&&propertyEntryTask.current&&['detail','list'].includes(propertySession.panel.type)) {const task=propertyEntryTask.current;propertyEntryTask.current=null;openTask(task);return;}
     if(sheet==='properties'&&propertySession.panel.type!=='list') {
       const panel=propertySession.panel;
-      updatePropertySession({panel:['detail','create','filters','settings'].includes(panel.type)?{type:'list'}:{type:'detail',id:panel.id}});return;
+      updatePropertySession({panel:['detail','create','filters','settings','selection'].includes(panel.type)?{type:'list'}:{type:'detail',id:panel.id}});return;
     }
     if (sheet==='caller') return requestCallerExit(leaveCaller);
     if (clientReturn.current) return returnToClient();

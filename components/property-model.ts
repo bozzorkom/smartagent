@@ -133,6 +133,7 @@ export type PropertyRequest = {
   operation?: Listing["operation"];
   price?: number;
   currency?: string;
+  unit?: PriceUnit;
   districts?: string[];
 };
 export type PropertyTarget = {
@@ -159,6 +160,13 @@ export type PropertyCommand = { operationId: string } & (
       type: "link" | "unlink";
       id: string;
       version: number;
+      clientId: string;
+      requestId: string;
+    }
+  | {
+      type: "linkMany";
+      scope: PropertyScope;
+      selections: { id: string; version: number }[];
       clientId: string;
       requestId: string;
     }
@@ -481,6 +489,12 @@ export function requestTargets(
                 : undefined,
           price: item.capture!.price ? Number(item.capture!.price) : undefined,
           currency: item.capture!.currency,
+          unit:
+            item.capture!.need === "Снять"
+              ? ("month" as const)
+              : item.capture!.need === "Купить"
+                ? ("total" as const)
+                : undefined,
           districts: item
             .capture!.districts.split(/[,;]+/)
             .map((value) => value.trim())
@@ -499,6 +513,46 @@ export function requestTargets(
         requests,
       };
     });
+}
+export function propertyRequestWarnings(
+  property: Property,
+  listing: Listing,
+  request: PropertyRequest,
+): string[] {
+  const warnings: string[] = [];
+  if (!request.operation)
+    warnings.push("Операция запроса не структурирована. Уточните потребность вручную.");
+  else if (request.operation !== listing.operation)
+    warnings.push("Операция отличается от запроса клиента.");
+  if (request.price == null)
+    warnings.push("Структурированный бюджет не указан. Цена с запросом не сравнивалась.");
+  else if (listing.price == null)
+    warnings.push("Цена объекта не указана. Сравнить с бюджетом нельзя.");
+  else {
+    if (!request.currency || request.currency !== listing.currency)
+      warnings.push("Валюты цены и бюджета отличаются или неизвестны. Пересчёт не выполняется.");
+    if (!request.unit || request.unit !== listing.unit)
+      warnings.push("Единицы цены и бюджета отличаются или неизвестны. Суммы не сравнивались.");
+    if (
+      request.operation === listing.operation &&
+      request.currency === listing.currency &&
+      request.unit === listing.unit &&
+      listing.price > request.price
+    )
+      warnings.push("Цена превышает сохранённый бюджет клиента.");
+  }
+  if (request.districts?.length) {
+    if (!property.district)
+      warnings.push("Район объекта не указан. Уточните местоположение.");
+    else if (!request.districts.some(
+      (district) => normalizePropertyText(district) === normalizePropertyText(property.district),
+    ))
+      warnings.push("Район отличается от выбранных в запросе клиента.");
+  }
+  if (property.area == null) warnings.push("Площадь объекта не указана.");
+  if (["apartment", "house"].includes(property.kind) && property.rooms == null)
+    warnings.push("Количество комнат объекта не указано.");
+  return warnings;
 }
 function inRange(value: number | undefined, min: string, max: string) {
   return (
@@ -837,10 +891,10 @@ export function applyPropertyCommand(
     ...state,
     operations: [...state.operations, command.operationId],
   };
-  const event = (listing: Listing, title: string, detail = "") => {
+  const event = (listing: Listing, title: string, detail = "", eventId = command.operationId) => {
     next.history = [
       {
-        id: command.operationId,
+        id: eventId,
         listingId: listing.id,
         at: now,
         title,
@@ -1106,6 +1160,45 @@ export function applyPropertyCommand(
       "Ответственный изменён",
       command.assignee || "Без ответственного",
     );
+  } else if (command.type === "linkMany") {
+    if (
+      !command.selections.length ||
+      command.selections.length > 100 ||
+      new Set(command.selections.map((selection) => selection.id)).size !== command.selections.length
+    )
+      return reject("Выберите от 1 до 100 разных предложений.");
+    const target = targets.find(
+      (value) => value.id === command.clientId && value.scope === command.scope,
+    );
+    const request = target?.requests.find((value) => value.id === command.requestId);
+    if (!target || !request)
+      return reject("Выберите доступный запрос клиента из этого пространства. Ничего не сохранено.");
+    const chosen: Listing[] = [];
+    for (const selection of command.selections) {
+      const candidate = state.listings.find((value) => value.id === selection.id);
+      if (
+        !candidate || !canViewListing(candidate, access) || candidate.scope !== command.scope ||
+        !state.properties.some((value) => value.id === candidate.propertyId && value.scope === command.scope)
+      )
+        return reject("Один из объектов не найден или недоступен. Пересмотрите выбор. Ничего не сохранено.");
+      if (candidate.version !== selection.version)
+        return reject("Сведения выбранного объекта изменились. Сверьте изменения и обновите версии. Ничего не сохранено.");
+      if (candidate.archived || candidate.status !== "available")
+        return reject("Один из объектов больше не доступен для новой связи. Уберите его из выбора. Ничего не сохранено.");
+      chosen.push(candidate);
+    }
+    for (const candidate of chosen) {
+      if (state.links.some((link) =>
+        link.listingId === candidate.id && link.clientId === target.id && link.requestId === request.id,
+      )) continue;
+      next.links = [...next.links, {
+        listingId: candidate.id, clientId: target.id, requestId: request.id, at: now,
+      }];
+      event(candidate, "Объект связан с запросом",
+        `${target.name} · ${request.label}. Сообщение не отправлялось.`,
+        `${command.operationId}:${candidate.id}`,
+      );
+    }
   } else if (command.type === "link" || command.type === "unlink") {
     const target = targets.find(
       (t) =>
